@@ -401,8 +401,12 @@ const getDailyDeliveryReport = async (req, res) => {
 
 const generateMonthlyBills = async (req, res) => {
     try {
-        const month = req.query.month || req.body?.month; const year = req.query.year || req.body?.year;
-        if (!month || !year) return res.status(400).json({ message: 'month and year required' });
+        const rawMonth = req.query.month || req.body?.month;
+        const rawYear = req.query.year || req.body?.year;
+        if (!rawMonth || !rawYear) return res.status(400).json({ message: 'month and year required' });
+
+        const month = parseInt(rawMonth, 10);
+        const year = parseInt(rawYear, 10);
 
         // Get or create billing period
         const [bpRows] = await pool.query(
@@ -420,44 +424,90 @@ const generateMonthlyBills = async (req, res) => {
             billingPeriodId = bpRows[0].id;
         }
 
-        // Get all active subscriptions for this period
+        // Get all active subscriptions for this period or any deliveries that took place in this month
         const [subscriptions] = await pool.query(`
-            SELECT DISTINCT s.customer_id, s.product_id, s.quantity_per_day, s.price_per_unit,
-                   p.name as product_name
+            SELECT DISTINCT s.customer_id
             FROM subscriptions s
-            JOIN products p ON s.product_id = p.id
-            WHERE s.status = 'ACTIVE'
-              AND s.start_date <= LAST_DAY(STR_TO_DATE(CONCAT(?, '-', ?, '-01'), '%Y-%m-%d'))
-              AND (s.end_date IS NULL OR s.end_date >= STR_TO_DATE(CONCAT(?, '-', ?, '-01'), '%Y-%m-%d'))
+            WHERE s.start_date <= LAST_DAY(STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
+              AND (s.end_date IS NULL OR s.end_date >= STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
         `, [year, month, year, month]);
 
-        const customerIds = [...new Set(subscriptions.map(s => s.customer_id))];
+        const [deliveryCusts] = await pool.query(`
+            SELECT DISTINCT customer_id FROM deliveries 
+            WHERE MONTH(date) = ? AND YEAR(date) = ?
+        `, [month, year]);
+
+        const customerIds = [...new Set([...subscriptions.map(s => s.customer_id), ...deliveryCusts.map(d => d.customer_id)])];
         let generatedCount = 0;
+        let skippedFinalCount = 0;
 
         for (const customerId of customerIds) {
-            // Get this customer's deliveries for the month
-            const [deliveries] = await pool.query(`
-                SELECT d.*, s.quantity_per_day, s.price_per_unit as sub_price
+            // Check if customer already has a FINAL or PAID bill for this month/year — DO NOT OVERWRITE
+            const [[existingBill]] = await pool.query(`
+                SELECT id, status FROM bills 
+                WHERE customer_id = ? AND month = ? AND year = ? AND bill_type = 'SUBSCRIPTION'
+            `, [customerId, month, year]);
+
+            if (existingBill && (existingBill.status === 'FINAL' || existingBill.status === 'PAID')) {
+                skippedFinalCount++;
+                continue;
+            }
+
+            // Fetch all delivery_items for this customer in this month joined with deliveries
+            const [items] = await pool.query(`
+                SELECT 
+                    d.id as delivery_id,
+                    d.date as delivery_date,
+                    d.status as delivery_status,
+                    d.actual_quantity as delivery_actual_qty,
+                    di.id as item_id,
+                    di.product_id,
+                    COALESCE(di.subscription_qty, d.expected_quantity, 0) as subscription_qty,
+                    COALESCE(di.price_per_unit, (SELECT price_per_unit FROM subscriptions WHERE customer_id = d.customer_id AND status = 'ACTIVE' LIMIT 1), 60) as price_per_unit,
+                    COALESCE(di.actual_qty, (CASE WHEN d.status = 'DELIVERED' THEN d.actual_quantity ELSE 0 END)) as actual_qty
                 FROM deliveries d
-                LEFT JOIN subscriptions s ON s.customer_id = d.customer_id
-                    AND s.product_id = (SELECT product_id FROM subscriptions WHERE customer_id = d.customer_id AND status='ACTIVE' LIMIT 1)
+                LEFT JOIN delivery_items di ON di.delivery_id = d.id
                 WHERE d.customer_id = ? AND MONTH(d.date) = ? AND YEAR(d.date) = ?
+                ORDER BY d.date ASC
             `, [customerId, month, year]);
 
-            // Get this customer's add-ons for the month
-            const [addons] = await pool.query(`
-                SELECT * FROM delivery_addons
-                WHERE customer_id = ? AND MONTH(delivery_date) = ? AND YEAR(delivery_date) = ?
-                  AND status = 'APPROVED'
-            `, [customerId, month, year]);
-
-            // Calculate billing
+            // Calculate billing metrics
             let subscriptionCharge = 0;
             let addonCharge = 0;
-            let deliveredDays = 0;
-            let skippedDays = 0;
-            let missedDays = 0;
             let totalLiters = 0;
+            const datesDelivered = new Set();
+            const datesSkipped = new Set();
+            const datesMissed = new Set();
+            const allDeliveryDates = new Set();
+
+            for (const it of items) {
+                const dateStr = typeof it.delivery_date === 'string' ? it.delivery_date.slice(0, 10) : new Date(it.delivery_date).toISOString().slice(0, 10);
+                allDeliveryDates.add(dateStr);
+
+                if (it.delivery_status === 'DELIVERED') {
+                    datesDelivered.add(dateStr);
+                    const actualQty = parseFloat(it.actual_qty || 0);
+                    const subQty = parseFloat(it.subscription_qty || 0);
+                    const price = parseFloat(it.price_per_unit || 60);
+
+                    const baseQty = Math.min(actualQty, subQty);
+                    const extraQty = Math.max(0, actualQty - subQty);
+
+                    subscriptionCharge += baseQty * price;
+                    addonCharge += extraQty * price;
+                    totalLiters += actualQty;
+                } else if (it.delivery_status === 'CUSTOMER_SKIPPED') {
+                    datesSkipped.add(dateStr);
+                } else if (['NOT_DELIVERED', 'DELIVERY_FAILED', 'MISSED'].includes(it.delivery_status)) {
+                    datesMissed.add(dateStr);
+                }
+            }
+
+            const totalAmount = parseFloat((subscriptionCharge + addonCharge).toFixed(2));
+            const totalDays = allDeliveryDates.size;
+            const deliveredDays = datesDelivered.size;
+            const skippedDays = datesSkipped.size;
+            const missedDays = datesMissed.size;
 
             // Clear old ledger entries for this customer/period
             await pool.query(
@@ -465,21 +515,12 @@ const generateMonthlyBills = async (req, res) => {
                 [billingPeriodId, customerId]
             );
 
-            // SOURCE OF TRUTH HIERARCHY:
-            for (const del of deliveries) {
-                const isBillable = del.status === 'DELIVERED';
-                const actualQty = parseFloat(del.actual_quantity || 0);
-                const pricePerUnit = parseFloat(del.sub_price || del.price_per_unit || 60);
-                const billableAmt = isBillable ? actualQty * pricePerUnit : 0;
-
-                if (del.status === 'DELIVERED') {
-                    deliveredDays++;
-                    totalLiters += actualQty;
-                }
-                else if (del.status === 'CUSTOMER_SKIPPED') skippedDays++;
-                else if (['NOT_DELIVERED', 'DELIVERY_FAILED', 'MISSED'].includes(del.status)) missedDays++;
-
-                subscriptionCharge += billableAmt;
+            // Populate ledger
+            for (const it of items) {
+                const isBillable = it.delivery_status === 'DELIVERED';
+                const actualQty = parseFloat(it.actual_qty || 0);
+                const price = parseFloat(it.price_per_unit || 60);
+                const billableAmt = isBillable ? actualQty * price : 0;
 
                 await pool.query(`
                     INSERT INTO billing_ledger
@@ -488,43 +529,24 @@ const generateMonthlyBills = async (req, res) => {
                          delivery_status, price_per_unit, billable_amount, is_billable)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
-                    billingPeriodId, customerId, del.id, del.date,
-                    parseFloat(del.quantity_per_day || del.expected_quantity || 0),
-                    parseFloat(del.addon_quantity || 0),
-                    parseFloat(del.expected_quantity || 0),
+                    billingPeriodId, customerId, it.delivery_id, it.delivery_date,
+                    parseFloat(it.subscription_qty || 0),
+                    Math.max(0, actualQty - parseFloat(it.subscription_qty || 0)),
+                    parseFloat(it.subscription_qty || 0),
                     actualQty,
-                    del.status, pricePerUnit,
+                    it.delivery_status, price,
                     billableAmt, isBillable ? 1 : 0
                 ]);
             }
 
-            // Add addon ledger entries
-            for (const addon of addons) {
-                addonCharge += parseFloat(addon.total_amount);
-                // totalLiters doesn't strictly need addon_quantity here because it was already included in delivery actualQty if delivered
-                await pool.query(`
-                    INSERT INTO billing_ledger 
-                        (billing_period_id, customer_id, addon_id, record_date,
-                         subscription_qty, addon_qty, expected_qty, actual_qty,
-                         delivery_status, price_per_unit, billable_amount, is_billable)
-                    VALUES (?, ?, ?, ?, 0, ?, ?, ?, 'ADDON', ?, ?, 1)
-                `, [
-                    billingPeriodId, customerId, addon.id, addon.delivery_date,
-                    addon.addon_quantity, addon.addon_quantity, addon.addon_quantity,
-                    addon.price_per_unit, addon.total_amount
-                ]);
-            }
-
-            const totalAmount = subscriptionCharge + addonCharge;
-
-            // Upsert draft bill
+            // Upsert draft bill (status = 'DRAFT', never overwrites FINAL or PAID)
             await pool.query(`
                 INSERT INTO bills 
                     (billing_period_id, customer_id, month, year, total_days,
                      delivered_days, skipped_days, missed_days, total_liters,
-                     subscription_charge, addon_charge, amount, status,
+                     subscription_charge, addon_charge, amount, paid_amount, status,
                      generated_date, bill_type)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', CURDATE(), 'SUBSCRIPTION')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.00, 'DRAFT', CURDATE(), 'SUBSCRIPTION')
                 ON DUPLICATE KEY UPDATE
                     total_days = IF(status = 'DRAFT', VALUES(total_days), total_days),
                     delivered_days = IF(status = 'DRAFT', VALUES(delivered_days), delivered_days),
@@ -537,9 +559,10 @@ const generateMonthlyBills = async (req, res) => {
                     generated_date = IF(status = 'DRAFT', CURDATE(), generated_date)
             `, [
                 billingPeriodId, customerId, month, year,
-                deliveries.length, deliveredDays, skippedDays, missedDays, totalLiters,
+                totalDays, deliveredDays, skippedDays, missedDays, totalLiters,
                 subscriptionCharge, addonCharge, totalAmount
             ]);
+
             generatedCount++;
         }
 
@@ -547,9 +570,9 @@ const generateMonthlyBills = async (req, res) => {
         await pool.query(`
             INSERT INTO audit_log (user_id, action, entity_type, notes)
             VALUES (?, 'BILLS_GENERATED', 'billing_period', ?)
-        `, [req.user.id, `Generated draft bills for ${month}/${year} — ${generatedCount} customers`]);
+        `, [req.user.id, `Generated draft bills for ${month}/${year} — ${generatedCount} customers (${skippedFinalCount} final/paid bills skipped)`]);
 
-        res.json({ message: `Draft bills generated for ${generatedCount} customers`, month, year, billingPeriodId });
+        res.json({ message: `Draft bills generated for ${generatedCount} customers`, month, year, billingPeriodId, skippedFinal: skippedFinalCount });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: error.message || error.toString() });
@@ -596,7 +619,7 @@ const finalizeBill = async (req, res) => {
         await connection.beginTransaction();
         const { bill_id } = req.params;
         
-        const [bills] = await connection.query('SELECT * FROM bills WHERE id = ?', [bill_id]);
+        const [bills] = await connection.query('SELECT * FROM bills WHERE id = ? FOR UPDATE', [bill_id]);
         if (bills.length === 0) {
             await connection.rollback();
             return res.status(404).json({ message: 'Bill not found' });
@@ -607,49 +630,65 @@ const finalizeBill = async (req, res) => {
             return res.status(400).json({ message: 'Bill already finalized' });
         }
         
-        // Fetch customer wallet balance
-        const [[customer]] = await connection.query('SELECT wallet_balance FROM customers WHERE id = ?', [bill.customer_id]);
+        // Fetch customer wallet balance with row lock
+        const [[customer]] = await connection.query('SELECT wallet_balance FROM customers WHERE id = ? FOR UPDATE', [bill.customer_id]);
         if (!customer) {
             await connection.rollback();
             return res.status(404).json({ message: 'Customer not found' });
         }
+
         let walletBalance = parseFloat(customer.wallet_balance || 0);
         let billAmount = parseFloat(bill.amount);
-        let finalStatus = 'PENDING';
+        let currentPaid = parseFloat(bill.paid_amount || 0);
+        let remainingDue = Math.max(0, billAmount - currentPaid);
+        let amountDeductedFromWallet = 0;
         
-        if (walletBalance > 0) {
-            let amountToDeduct = Math.min(walletBalance, billAmount);
-            walletBalance -= amountToDeduct;
+        if (walletBalance > 0 && remainingDue > 0) {
+            amountDeductedFromWallet = Math.min(walletBalance, remainingDue);
+            walletBalance -= amountDeductedFromWallet;
+            currentPaid += amountDeductedFromWallet;
             
             // Deduct from wallet
             await connection.query('UPDATE customers SET wallet_balance = ? WHERE id = ?', [walletBalance, bill.customer_id]);
             await connection.query(`
                 INSERT INTO wallet_transactions (customer_id, type, amount, description, reference_id, reference_type, balance_after, created_by)
                 VALUES (?, 'DEBIT', ?, ?, ?, 'BILL', ?, ?)
-            `, [bill.customer_id, amountToDeduct, `Auto-deducted for Bill #${bill_id} (${bill.month}/${bill.year})`, bill_id, walletBalance, req.user.id]);
-            
-            if (amountToDeduct >= billAmount) {
-                finalStatus = 'PAID';
-            }
+            `, [bill.customer_id, amountDeductedFromWallet, `Auto-deducted for Bill #${bill_id} (${bill.month}/${bill.year})`, bill_id, walletBalance, req.user.id]);
+
+            // Record in payments table
+            await connection.query(`
+                INSERT INTO payments (bill_id, customer_id, amount, method, reference, collected_by, status)
+                VALUES (?, ?, ?, 'WALLET', ?, ?, 'CONFIRMED')
+            `, [bill_id, bill.customer_id, amountDeductedFromWallet, `Auto-deducted from wallet for Bill #${bill_id}`, req.user.id]);
         }
         
+        const isFullyPaid = currentPaid >= billAmount;
+        const finalStatus = isFullyPaid ? 'PAID' : 'FINAL';
+
         await connection.query(`
-            UPDATE bills SET status = ?, finalized_at = NOW(), finalized_by = ?
+            UPDATE bills 
+            SET status = ?, paid_amount = ?, finalized_at = NOW(), finalized_by = ?, paid_at = IF(? >= amount, NOW(), paid_at)
             WHERE id = ?
-        `, [finalStatus, req.user.id, bill_id]);
+        `, [finalStatus, currentPaid, req.user.id, currentPaid, bill_id]);
         
         await connection.query(`
             INSERT INTO audit_log (user_id, action, entity_type, entity_id, old_value, new_value, notes)
             VALUES (?, 'BILL_FINALIZED', 'bill', ?, ?, ?, ?)
         `, [
             req.user.id, bill_id,
-            JSON.stringify({ status: bill.status }),
-            JSON.stringify({ status: finalStatus }),
+            JSON.stringify({ status: bill.status, paid_amount: bill.paid_amount }),
+            JSON.stringify({ status: finalStatus, paid_amount: currentPaid }),
             `Bill finalized by admin for customer ${bill.customer_id} - ${bill.month}/${bill.year}`
         ]);
         
         await connection.commit();
-        res.json({ message: 'Bill finalized' + (finalStatus === 'PAID' ? ' and auto-paid from wallet' : '') });
+        res.json({ 
+            message: 'Bill finalized' + (finalStatus === 'PAID' ? ' and auto-paid from wallet' : ''),
+            bill_id,
+            status: finalStatus,
+            paid_amount: currentPaid,
+            amount: billAmount
+        });
     } catch (error) {
         await connection.rollback();
         console.error(error);
@@ -658,6 +697,73 @@ const finalizeBill = async (req, res) => {
         connection.release();
     }
 };
+
+const recordBillPayment = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const { id } = req.params;
+        const { amount, method = 'CASH', reference } = req.body;
+        const payAmount = parseFloat(amount);
+
+        if (!payAmount || payAmount <= 0) {
+            connection.release();
+            return res.status(400).json({ message: 'Valid payment amount is required' });
+        }
+
+        await connection.beginTransaction();
+
+        const [bills] = await connection.query('SELECT * FROM bills WHERE id = ? FOR UPDATE', [id]);
+        if (bills.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Bill not found' });
+        }
+        const bill = bills[0];
+
+        // Insert into payments table
+        await connection.query(`
+            INSERT INTO payments (bill_id, customer_id, amount, method, reference, collected_by, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'CONFIRMED')
+        `, [id, bill.customer_id, payAmount, method, reference || null, req.user.id]);
+
+        const currentPaid = parseFloat(bill.paid_amount || 0);
+        const newPaidAmount = currentPaid + payAmount;
+        const billAmount = parseFloat(bill.amount);
+        const isFullyPaid = newPaidAmount >= billAmount;
+        const newStatus = isFullyPaid ? 'PAID' : (bill.status === 'DRAFT' ? 'FINAL' : bill.status);
+
+        await connection.query(`
+            UPDATE bills 
+            SET paid_amount = ?, status = ?, paid_at = IF(? >= amount, NOW(), paid_at)
+            WHERE id = ?
+        `, [newPaidAmount, newStatus, newPaidAmount, id]);
+
+        await connection.query(`
+            INSERT INTO audit_log (user_id, action, entity_type, entity_id, old_value, new_value, notes)
+            VALUES (?, 'PAYMENT_RECORDED', 'bill', ?, ?, ?, ?)
+        `, [
+            req.user.id, id,
+            JSON.stringify({ paid_amount: currentPaid, status: bill.status }),
+            JSON.stringify({ paid_amount: newPaidAmount, status: newStatus, payment: payAmount, method }),
+            `Payment of ₹${payAmount} via ${method} recorded for Bill #${id}`
+        ]);
+
+        await connection.commit();
+        res.json({
+            message: 'Payment recorded successfully',
+            bill_id: id,
+            paid_amount: newPaidAmount,
+            amount: billAmount,
+            status: newStatus
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error(error);
+        res.status(500).json({ message: error.message || error.toString() });
+    } finally {
+        connection.release();
+    }
+};
+
 const getBillingOverview = async (req, res) => {
     try {
         const month = req.query.month || req.body?.month; const year = req.query.year || req.body?.year;
@@ -1178,4 +1284,4 @@ module.exports = {
   handleQuantityChangeRequest,
     getUpcomingExceptions,
     addManualException,
-    getTomorrowRoutesSummary, getDashboard, addCustomer, assignRoute, getDailyLogs, generateBills, getMonthlyBilling, getDeliveryBoys, addDeliveryBoy, getCustomers, getDailyDeliveryReport, generateMonthlyBills, getCustomerLedger, finalizeBill, getBillingOverview };
+    getTomorrowRoutesSummary, getDashboard, addCustomer, assignRoute, getDailyLogs, generateBills, getMonthlyBilling, getDeliveryBoys, addDeliveryBoy, getCustomers, getDailyDeliveryReport, generateMonthlyBills, getCustomerLedger, finalizeBill, recordBillPayment, getBillingOverview };

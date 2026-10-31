@@ -94,6 +94,20 @@ const checkoutOnetimeSchema = z.object({
     })).min(1, "Cart cannot be empty")
 });
 
+const recordPaymentSchema = z.object({
+    amount: z.coerce.number().positive("Amount must be greater than 0"),
+    method: z.enum(['CASH', 'UPI', 'CARD', 'WALLET', 'ONLINE']).default('CASH'),
+    reference: z.string().max(100).optional()
+});
+
+const verifyPaymentSchema = z.object({
+    razorpay_order_id: z.string().min(1),
+    razorpay_payment_id: z.string().min(1),
+    razorpay_signature: z.string().min(1),
+    bill_id: z.coerce.number().int().positive().optional(),
+    amount: z.coerce.number().positive().optional()
+});
+
 module.exports = {
     loginSchema,
     signupSchema,
@@ -104,5 +118,7 @@ module.exports = {
     deliveryBoySchema,
     assignRouteSchema,
     requirementsSchema,
-    checkoutOnetimeSchema
+    checkoutOnetimeSchema,
+    recordPaymentSchema,
+    verifyPaymentSchema
 };

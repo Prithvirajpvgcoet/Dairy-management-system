@@ -20,6 +20,7 @@ const {
     generateMonthlyBills,
     getCustomerLedger,
     finalizeBill,
+    recordBillPayment,
     getBillingOverview,
     getUpcomingExceptions,
     addManualException,
@@ -34,7 +35,7 @@ const { getInventory, updateInventory } = require('../controllers/inventoryContr
 const { protect } = require('../middlewares/authMiddleware');
 const { authorize } = require('../middlewares/roleMiddleware');
 const { validate } = require('../middlewares/validateMiddleware');
-const { customerSchema, deliveryBoySchema, assignRouteSchema, productSchema } = require('../validations/schemas');
+const { customerSchema, deliveryBoySchema, assignRouteSchema, productSchema, recordPaymentSchema } = require('../validations/schemas');
 const router = express.Router();
 
 // All admin routes require auth
@@ -75,6 +76,7 @@ router.get('/bills/:id/pdf', authorize('ADMIN', 'BILLING_CLERK'), downloadAdminB
 router.post('/billing/generate', authorize('ADMIN', 'BILLING_CLERK'), generateMonthlyBills);
 router.get('/billing/ledger/:customer_id', authorize('ADMIN', 'BILLING_CLERK'), getCustomerLedger);
 router.post('/billing/finalize/:bill_id', authorize('ADMIN', 'BILLING_CLERK'), finalizeBill);
+router.post('/bills/:id/pay', authorize('ADMIN', 'BILLING_CLERK'), validate(recordPaymentSchema), recordBillPayment);
 
 // Products
 router.get('/products', authorize('ADMIN', 'INVENTORY_MNGR'), list);

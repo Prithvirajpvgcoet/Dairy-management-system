@@ -1,5 +1,5 @@
 const express = require('express');
-const { getTodayRoute, markDelivered, collectPayment, getSummary, getMyPerformance } = require('../controllers/deliveryController');
+const { getTodayRoute, markDelivered, undoDelivery, collectPayment, getSummary, getMyPerformance } = require('../controllers/deliveryController');
 const { protect } = require('../middlewares/authMiddleware');
 const { authorize } = require('../middlewares/roleMiddleware');
 const { validate } = require('../middlewares/validateMiddleware');
@@ -11,6 +11,7 @@ router.use(authorize('DELIVERY_BOY'));
 
 router.get('/today-route', getTodayRoute);
 router.post('/mark-delivered', validate(deliveryStatusSchema), markDelivered);
+router.put('/:id/undo', undoDelivery);
 router.post('/collect-payment', validate(collectPaymentSchema), collectPayment);
 router.get('/summary', getSummary);
 

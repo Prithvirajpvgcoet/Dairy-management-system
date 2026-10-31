@@ -25,10 +25,17 @@ function isDateAfter(dateStr1, dateStr2) {
     return String(dateStr1).slice(0, 10) > String(dateStr2).slice(0, 10);
 }
 
+function isPastNoonIST(d = new Date()) {
+    const istTimeStr = d.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false });
+    const [h] = istTimeStr.split(':').map(Number);
+    return h >= 12;
+}
+
 module.exports = {
     todayIST,
     nowIST,
     addDays,
     isDateBefore,
-    isDateAfter
+    isDateAfter,
+    isPastNoonIST
 };

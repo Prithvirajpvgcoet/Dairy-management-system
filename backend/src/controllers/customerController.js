@@ -136,7 +136,7 @@ const getBills = async (req, res) => {
         const customerId = customerResult[0].id;
 
         const [bills] = await pool.query(`
-            SELECT id, month, year, amount, status, generated_date, bill_type
+            SELECT id, month, year, amount, paid_amount, status, generated_date, bill_type
             FROM bills
             WHERE customer_id = ?
             ORDER BY year DESC, CAST(month AS UNSIGNED) DESC, id DESC
