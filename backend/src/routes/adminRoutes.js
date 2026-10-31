@@ -24,7 +24,10 @@ const {
     getUpcomingExceptions,
     addManualException,
     getTomorrowRoutesSummary,
-    addStaff
+    addStaff,
+    generateDailyDeliveries,
+    reorderRoute,
+    optimizeRouteByDistance
 } = require('../controllers/adminController');
 const { list, create, update, remove } = require('../controllers/productController');
 const { getInventory, updateInventory } = require('../controllers/inventoryController');
@@ -53,6 +56,9 @@ router.post('/staff', authorize('ADMIN'), addStaff);
 
 // Routes
 router.post('/assign-route', authorize('ADMIN', 'SUPPORT'), validate(assignRouteSchema), assignRoute);
+router.post('/routes/reorder', authorize('ADMIN', 'SUPPORT'), reorderRoute);
+router.post('/routes/optimize', authorize('ADMIN', 'SUPPORT'), optimizeRouteByDistance);
+router.post('/deliveries/generate', authorize('ADMIN', 'SUPPORT'), generateDailyDeliveries);
 router.get('/daily-logs', authorize('ADMIN', 'SUPPORT', 'BILLING_CLERK', 'INVENTORY_MNGR'), getDailyLogs);
 router.post('/generate-bills', authorize('ADMIN', 'BILLING_CLERK'), generateBills);
 router.get('/monthly-billing', authorize('ADMIN', 'BILLING_CLERK'), getMonthlyBilling);

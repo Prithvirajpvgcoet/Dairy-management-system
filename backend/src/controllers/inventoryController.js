@@ -1,8 +1,9 @@
+const { todayIST } = require('../utils/date');
 const pool = require('../config/db');
 
 const getInventory = async (req, res) => {
     try {
-        const date = req.query.date || new Date().toISOString().split('T')[0];
+        const date = req.query.date || todayIST();
 
         // 1. Get all products
         const [products] = await pool.query('SELECT * FROM products ORDER BY id ASC');

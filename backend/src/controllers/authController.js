@@ -60,13 +60,7 @@ const signup = async (req, res) => {
                 [userId, address || 'N/A']
             );
 
-            const customerId = (await connection.query('SELECT LAST_INSERT_ID() as id'))[0][0].id;
-
-            // Default requirement of 1L Cow Milk
-            await connection.query(
-                'INSERT INTO customer_requirements (customer_id, product_id, quantity) VALUES (?, 1, 1)',
-                [customerId]
-            );
+            // New customer created without hardcoded requirement; customer subscribes to plan
 
             await connection.commit();
             const token = generateToken(userId, userRole);

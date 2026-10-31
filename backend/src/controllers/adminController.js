@@ -1,3 +1,4 @@
+const { todayIST, addDays } = require('../utils/date');
 const pool = require('../config/db');
 const { notifyAdminAndDeliveryBoy } = require('../services/notificationService');
 const bcrypt = require('bcryptjs');
@@ -156,7 +157,7 @@ const assignRoute = async (req, res) => {
 
 const getDailyLogs = async (req, res) => {
     try {
-        const date = req.query.date || new Date().toISOString().split('T')[0];
+        const date = req.query.date || todayIST();
         
         const [logs] = await pool.query(`
             SELECT 
@@ -356,7 +357,7 @@ const getCustomers = async (req, res) => {
 const getDailyDeliveryReport = async (req, res) => {
     try {
         const { date, delivery_boy_id } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
+        const targetDate = date || todayIST();
         
         let query = `
             SELECT 
@@ -769,7 +770,7 @@ const getTomorrowRoutesSummary = async (req, res) => {
         // Find tomorrow's date
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const tomorrowStr = addDays(todayIST(), 1);
 
         // We want to list all delivery boys and see how many of their assigned customers have skips/addons tomorrow.
         const [routes] = await pool.query(`
@@ -841,7 +842,7 @@ const handleQuantityChangeRequest = async (req, res) => {
       }
       
       // Update today's PENDING deliveries if effective date is today or earlier
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = todayIST();
       const reqDateStr = new Date(request.effective_date).toISOString().split('T')[0];
       if (reqDateStr <= todayStr) {
         await pool.query(
@@ -1073,7 +1074,100 @@ const addStaff = async (req, res) => {
     }
 };
 
+
+const { generateForDate } = require('../services/deliveryGenerator');
+
+const generateDailyDeliveries = async (req, res) => {
+    try {
+        const date = req.query.date || req.body?.date;
+        const result = await generateForDate(date);
+        res.json({ message: 'Deliveries generated successfully', result });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Failed to generate deliveries', error: err.message });
+    }
+};
+
+const reorderRoute = async (req, res) => {
+    try {
+        const { deliveryBoyId, orderedCustomerIds } = req.body;
+        if (!deliveryBoyId || !Array.isArray(orderedCustomerIds)) {
+            return res.status(400).json({ message: 'deliveryBoyId and orderedCustomerIds array required' });
+        }
+        for (let i = 0; i < orderedCustomerIds.length; i++) {
+            await pool.query(
+                'UPDATE delivery_routes SET stop_order = ? WHERE delivery_boy_id = ? AND customer_id = ?',
+                [i + 1, deliveryBoyId, orderedCustomerIds[i]]
+            );
+        }
+        res.json({ message: 'Route stop order updated successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error reordering route', error: err.message });
+    }
+};
+
+const optimizeRouteByDistance = async (req, res) => {
+    try {
+        const { deliveryBoyId } = req.body;
+        if (!deliveryBoyId) return res.status(400).json({ message: 'deliveryBoyId is required' });
+
+        const [stops] = await pool.query(`
+            SELECT dr.customer_id, c.gps_lat, c.gps_lng, u.name
+            FROM delivery_routes dr
+            JOIN customers c ON dr.customer_id = c.id
+            JOIN users u ON c.user_id = u.id
+            WHERE dr.delivery_boy_id = ?
+        `, [deliveryBoyId]);
+
+        if (stops.length <= 2) {
+            return res.json({ message: 'Route optimized (2 or fewer stops)', stops });
+        }
+
+        const dist = (p1, p2) => {
+            const lat1 = parseFloat(p1.gps_lat) || 0;
+            const lng1 = parseFloat(p1.gps_lng) || 0;
+            const lat2 = parseFloat(p2.gps_lat) || 0;
+            const lng2 = parseFloat(p2.gps_lng) || 0;
+            return Math.hypot(lat2 - lat1, lng2 - lng1);
+        };
+
+        const unvisited = [...stops];
+        const ordered = [unvisited.shift()];
+
+        while (unvisited.length > 0) {
+            const current = ordered[ordered.length - 1];
+            let bestIdx = 0;
+            let bestDist = Infinity;
+
+            for (let i = 0; i < unvisited.length; i++) {
+                const d = dist(current, unvisited[i]);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestIdx = i;
+                }
+            }
+            ordered.push(unvisited.splice(bestIdx, 1)[0]);
+        }
+
+        for (let i = 0; i < ordered.length; i++) {
+            await pool.query(
+                'UPDATE delivery_routes SET stop_order = ? WHERE delivery_boy_id = ? AND customer_id = ?',
+                [i + 1, deliveryBoyId, ordered[i].customer_id]
+            );
+        }
+
+        res.json({ message: 'Route optimized successfully using nearest-neighbor sequencing', ordered });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Error optimizing route', error: err.message });
+    }
+};
+
 module.exports = {
+  generateDailyDeliveries,
+  reorderRoute,
+  optimizeRouteByDistance,
   addStaff,
   getAuditLogs,
   getDeliveryPerformance,

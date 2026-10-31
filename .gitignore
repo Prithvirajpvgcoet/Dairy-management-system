@@ -28,3 +28,8 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Database backups
+backup_*.sql
+database/backup_*.sql
+

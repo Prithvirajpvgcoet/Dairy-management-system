@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { todayIST } = require('../utils/date');
 const { notifyAdminAndDeliveryBoy } = require('../services/notificationService');
 
 // ─── 1. GET /customer/subscriptions ────────────────────────────────────────────
@@ -356,8 +357,9 @@ const cancelSkip = async (req, res) => {
 
     const [[skip]] = await pool.query('SELECT * FROM delivery_skip_requests WHERE id = ? AND customer_id = ?', [id, customer.id]);
     if (!skip) return res.status(404).json({ message: 'Skip not found' });
-    if (skip.skip_date <= new Date().toISOString().split('T')[0]) {
-      return res.status(400).json({ message: 'Cannot cancel a skip that has already passed' });
+    const skipDateStr = String(skip.skip_date).slice(0, 10);
+    if (skipDateStr <= todayIST()) {
+      return res.status(400).json({ message: 'Cannot cancel a skip for today or a past date' });
     }
 
     await pool.query('DELETE FROM delivery_skip_requests WHERE id = ?', [id]);
