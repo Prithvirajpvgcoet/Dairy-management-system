@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { generateForDate } = require('./deliveryGenerator');
 const { todayIST, addDays } = require('../utils/date');
+const { runNightlyBackup } = require('../jobs/backupJob');
 
 function startCronJobs() {
     console.log('[Cron] Initializing daily delivery generator scheduler in Asia/Kolkata timezone...');
@@ -13,6 +14,18 @@ function startCronJobs() {
             await generateForDate(tomorrow);
         } catch (err) {
             console.error('[Cron] Failed 23:30 delivery generation:', err);
+        }
+    }, {
+        timezone: 'Asia/Kolkata'
+    });
+
+    // 02:00 IST daily: automated database backup with 14-day retention
+    cron.schedule('0 2 * * *', () => {
+        console.log('[Cron] 02:00 IST trigger: Running nightly database backup');
+        try {
+            runNightlyBackup();
+        } catch (err) {
+            console.error('[Cron] Failed 02:00 database backup:', err);
         }
     }, {
         timezone: 'Asia/Kolkata'
@@ -31,7 +44,7 @@ function startCronJobs() {
         timezone: 'Asia/Kolkata'
     });
 
-    console.log('[Cron] Delivery generator cron jobs scheduled: 23:30 IST (tomorrow) & 04:30 IST (today).');
+    console.log('[Cron] Jobs scheduled: 23:30 IST (deliveries), 02:00 IST (backup), 04:30 IST (safety re-run).');
 }
 
 module.exports = { startCronJobs };
