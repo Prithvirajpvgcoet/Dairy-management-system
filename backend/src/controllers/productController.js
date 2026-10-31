@@ -42,8 +42,13 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
     try {
         const { id } = req.params;
-        await pool.query('DELETE FROM products WHERE id=?', [id]);
-        res.json({ message: 'Deleted' });
+        // Soft delete to avoid breaking foreign key constraints on subscriptions and orders
+        try {
+            await pool.query('UPDATE products SET in_stock = 0, is_active = 0 WHERE id = ?', [id]);
+        } catch (e) {
+            await pool.query('UPDATE products SET in_stock = 0 WHERE id = ?', [id]);
+        }
+        res.json({ message: 'Product deactivated (soft deleted)' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

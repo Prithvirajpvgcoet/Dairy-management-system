@@ -250,7 +250,7 @@ const generateBills = async (req, res) => {
 
 const getMonthlyBilling = async (req, res) => {
     try {
-        const { month, year } = req.query; // month is e.g. "January"
+        const month = req.query.month || req.body?.month; const year = req.query.year || req.body?.year; // month is e.g. "January"
         const monthMap = { 'January': '01', 'February': '02', 'March': '03', 'April': '04', 'May': '05', 'June': '06', 'July': '07', 'August': '08', 'September': '09', 'October': '10', 'November': '11', 'December': '12' };
         const monthNum = monthMap[month];
 
@@ -400,7 +400,7 @@ const getDailyDeliveryReport = async (req, res) => {
 
 const generateMonthlyBills = async (req, res) => {
     try {
-        const { month, year } = req.query;
+        const month = req.query.month || req.body?.month; const year = req.query.year || req.body?.year;
         if (!month || !year) return res.status(400).json({ message: 'month and year required' });
 
         // Get or create billing period
@@ -525,16 +525,15 @@ const generateMonthlyBills = async (req, res) => {
                      generated_date, bill_type)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', CURDATE(), 'SUBSCRIPTION')
                 ON DUPLICATE KEY UPDATE
-                    total_days = VALUES(total_days),
-                    delivered_days = VALUES(delivered_days),
-                    skipped_days = VALUES(skipped_days),
-                    missed_days = VALUES(missed_days),
-                    total_liters = VALUES(total_liters),
-                    subscription_charge = VALUES(subscription_charge),
-                    addon_charge = VALUES(addon_charge),
-                    amount = VALUES(amount),
-                    status = 'DRAFT',
-                    generated_date = CURDATE()
+                    total_days = IF(status = 'DRAFT', VALUES(total_days), total_days),
+                    delivered_days = IF(status = 'DRAFT', VALUES(delivered_days), delivered_days),
+                    skipped_days = IF(status = 'DRAFT', VALUES(skipped_days), skipped_days),
+                    missed_days = IF(status = 'DRAFT', VALUES(missed_days), missed_days),
+                    total_liters = IF(status = 'DRAFT', VALUES(total_liters), total_liters),
+                    subscription_charge = IF(status = 'DRAFT', VALUES(subscription_charge), subscription_charge),
+                    addon_charge = IF(status = 'DRAFT', VALUES(addon_charge), addon_charge),
+                    amount = IF(status = 'DRAFT', VALUES(amount), amount),
+                    generated_date = IF(status = 'DRAFT', CURDATE(), generated_date)
             `, [
                 billingPeriodId, customerId, month, year,
                 deliveries.length, deliveredDays, skippedDays, missedDays, totalLiters,
@@ -559,7 +558,7 @@ const generateMonthlyBills = async (req, res) => {
 const getCustomerLedger = async (req, res) => {
     try {
         const { customer_id } = req.params;
-        const { month, year } = req.query;
+        const month = req.query.month || req.body?.month; const year = req.query.year || req.body?.year;
         
         const [ledger] = await pool.query(`
             SELECT bl.*, d.delivery_timestamp, d.gps_latitude, d.gps_longitude
@@ -597,7 +596,10 @@ const finalizeBill = async (req, res) => {
         const { bill_id } = req.params;
         
         const [bills] = await connection.query('SELECT * FROM bills WHERE id = ?', [bill_id]);
-        if (bills.length === 0) return res.status(404).json({ message: 'Bill not found' });
+        if (bills.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Bill not found' });
+        }
         const bill = bills[0];
         if (bill.status === 'FINAL' || bill.status === 'PAID') {
             await connection.rollback();
@@ -606,6 +608,10 @@ const finalizeBill = async (req, res) => {
         
         // Fetch customer wallet balance
         const [[customer]] = await connection.query('SELECT wallet_balance FROM customers WHERE id = ?', [bill.customer_id]);
+        if (!customer) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Customer not found' });
+        }
         let walletBalance = parseFloat(customer.wallet_balance || 0);
         let billAmount = parseFloat(bill.amount);
         let finalStatus = 'PENDING';
@@ -653,7 +659,7 @@ const finalizeBill = async (req, res) => {
 };
 const getBillingOverview = async (req, res) => {
     try {
-        const { month, year } = req.query;
+        const month = req.query.month || req.body?.month; const year = req.query.year || req.body?.year;
         
         const [bills] = await pool.query(`
             SELECT b.*, u.name as customer_name, u.phone
@@ -669,8 +675,8 @@ const getBillingOverview = async (req, res) => {
             draft: bills.filter(b => b.status === 'DRAFT').length,
             final: bills.filter(b => b.status === 'FINAL').length,
             paid: bills.filter(b => b.status === 'PAID').length,
-            totalAmount: bills.reduce((s, b) => s + parseFloat(b.total_amount || 0), 0),
-            paidAmount: bills.filter(b => b.status === 'PAID').reduce((s, b) => s + parseFloat(b.total_amount || 0), 0),
+            totalAmount: bills.reduce((s, b) => s + parseFloat(b.amount || 0), 0),
+            paidAmount: bills.filter(b => b.status === 'PAID').reduce((s, b) => s + parseFloat(b.amount || 0), 0),
         };
         
         res.json({ summary, bills });
@@ -990,7 +996,7 @@ const downloadAdminBillPDF = async (req, res) => {
 
 const getDeliveryPerformance = async (req, res) => {
     try {
-        const { month, year } = req.query; // optional
+        const month = req.query.month || req.body?.month; const year = req.query.year || req.body?.year; // optional
         let dateCondition = "WHERE d.date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
         let queryParams = [];
         
@@ -1040,7 +1046,35 @@ const getAuditLogs = async (req, res) => {
     }
 };
 
+
+const addStaff = async (req, res) => {
+    try {
+        const { name, phone, email, password, role } = req.body;
+        const validRoles = ['INVENTORY_MNGR', 'BILLING_CLERK', 'SUPPORT', 'ADMIN'];
+        const staffRole = validRoles.includes(role) ? role : 'SUPPORT';
+
+        const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'User already exists with this email' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        await pool.query(
+            'INSERT INTO users (name, phone, email, password, role) VALUES (?, ?, ?, ?, ?)',
+            [name, phone, email, hashedPassword, staffRole]
+        );
+
+        res.status(201).json({ message: 'Staff added successfully with role: ' + staffRole });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error adding staff' });
+    }
+};
+
 module.exports = {
+  addStaff,
   getAuditLogs,
   getDeliveryPerformance,
   downloadAdminBillPDF,

@@ -43,7 +43,8 @@ const signup = async (req, res) => {
         try {
             await connection.beginTransaction();
 
-            const userRole = req.body.role === 'DELIVERY_BOY' ? 'DELIVERY_BOY' : 'CUSTOMER';
+            // Task 1.7: Public signup is locked strictly to CUSTOMER role
+            const userRole = 'CUSTOMER';
 
             // Insert into users table
             const [userResult] = await connection.query(
@@ -53,27 +54,19 @@ const signup = async (req, res) => {
 
             const userId = userResult.insertId;
 
-            if (userRole === 'CUSTOMER') {
-                // Insert into customers table
-                await connection.query(
-                    'INSERT INTO customers (user_id, address) VALUES (?, ?)',
-                    [userId, address || 'N/A']
-                );
+            // Insert into customers table
+            await connection.query(
+                'INSERT INTO customers (user_id, address) VALUES (?, ?)',
+                [userId, address || 'N/A']
+            );
 
-                const customerId = (await connection.query('SELECT LAST_INSERT_ID() as id'))[0][0].id;
+            const customerId = (await connection.query('SELECT LAST_INSERT_ID() as id'))[0][0].id;
 
-                // Give them a default requirement of 1L Cow Milk (Product ID 1)
-                await connection.query(
-                    'INSERT INTO customer_requirements (customer_id, product_id, quantity) VALUES (?, 1, 1)',
-                    [customerId]
-                );
-            } else if (userRole === 'DELIVERY_BOY') {
-                // Insert into delivery_boys table
-                await connection.query(
-                    'INSERT INTO delivery_boys (user_id, joining_date, salary_type, salary_rate) VALUES (?, CURDATE(), ?, ?)',
-                    [userId, 'FIXED', 5000] // Default salary
-                );
-            }
+            // Default requirement of 1L Cow Milk
+            await connection.query(
+                'INSERT INTO customer_requirements (customer_id, product_id, quantity) VALUES (?, 1, 1)',
+                [customerId]
+            );
 
             await connection.commit();
             const token = generateToken(userId, userRole);

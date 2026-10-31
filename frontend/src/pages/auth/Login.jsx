@@ -3,7 +3,6 @@ import { LogIn, UserPlus, ShieldCheck, Truck, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 
-
 const Login = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('customer'); // 'customer', 'delivery', 'admin'
@@ -22,13 +21,15 @@ const Login = () => {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setIsSignup(false);
     setError('');
   };
 
-  const isSignupFlow = (activeTab === 'customer' || activeTab === 'delivery') && isSignup;
+  // Only customers can sign up publicly
+  const isSignupFlow = activeTab === 'customer' && isSignup;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,31 +40,45 @@ const Login = () => {
     
     try {
       const payload = isSignupFlow 
-        ? { ...formData, role: activeTab === 'delivery' ? 'DELIVERY_BOY' : 'CUSTOMER' }
+        ? { ...formData, role: 'CUSTOMER' }
         : { email: formData.email, password: formData.password };
         
       const response = await api.post(endpoint, payload);
-      
       const data = response.data;
       
-      if (response) {
+      if (data && data.token) {
+        // Validate tab vs role agreement before saving token
+        if (!isSignupFlow) {
+          const adminRoles = ['ADMIN', 'INVENTORY_MNGR', 'BILLING_CLERK', 'SUPPORT'];
+          
+          if (activeTab === 'admin' && !adminRoles.includes(data.role)) {
+            setError('Access denied: Not an administrative staff account.');
+            return;
+          }
+          if (activeTab === 'delivery' && data.role !== 'DELIVERY_BOY') {
+            setError('Access denied: Not a delivery partner account.');
+            return;
+          }
+          if (activeTab === 'customer' && data.role !== 'CUSTOMER') {
+            setError('Access denied: Not a customer account. Please use the appropriate portal.');
+            return;
+          }
+        }
+
+        // Store token, role, and name only after role validation passes
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role);
-        
-        if (!isSignupFlow) {
-           if (activeTab === 'admin' && data.role !== 'ADMIN') {
-              setError('Access denied: Not an admin account.');
-              return;
-           }
-           if (activeTab === 'delivery' && data.role !== 'DELIVERY_BOY') {
-              setError('Access denied: Not a delivery partner account.');
-              return;
-           }
+        if (data.name) localStorage.setItem('name', data.name);
+
+        // Redirect map
+        const adminRoles = ['ADMIN', 'INVENTORY_MNGR', 'BILLING_CLERK', 'SUPPORT'];
+        if (adminRoles.includes(data.role)) {
+          navigate('/admin');
+        } else if (data.role === 'DELIVERY_BOY') {
+          navigate('/delivery');
+        } else {
+          navigate('/customer');
         }
-        
-        if (data.role === 'ADMIN') navigate('/admin');
-        else if (data.role === 'DELIVERY_BOY') navigate('/delivery');
-        else navigate('/customer');
       }
     } catch (err) {
       console.error('Error during authentication:', err);
@@ -134,12 +149,10 @@ const Login = () => {
                   <label className="block text-xs font-bold text-gray-700 mb-1">Phone Number</label>
                   <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+91 98765 43210" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-[#1551b5] focus:border-[#1551b5] transition outline-none text-sm" required />
                 </div>
-                {activeTab === 'customer' && (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Delivery Address</label>
-                    <textarea name="address" value={formData.address} onChange={handleChange} placeholder="Your complete address..." className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-[#1551b5] focus:border-[#1551b5] transition outline-none text-sm resize-none" rows="2" required></textarea>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Delivery Address</label>
+                  <textarea name="address" value={formData.address} onChange={handleChange} placeholder="Your complete address..." className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-[#1551b5] focus:border-[#1551b5] transition outline-none text-sm resize-none" rows="2" required></textarea>
+                </div>
               </>
             )}
 
@@ -160,7 +173,7 @@ const Login = () => {
             </button>
           </form>
 
-          {(activeTab === 'customer' || activeTab === 'delivery') && (
+          {activeTab === 'customer' && (
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 {isSignup ? "Already have an account?" : "Don't have an account?"}{' '}
@@ -175,10 +188,10 @@ const Login = () => {
             </div>
           )}
           
-          {activeTab === 'admin' && (
+          {(activeTab === 'admin' || activeTab === 'delivery') && (
             <div className="mt-6 text-center">
               <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                Authorized Personnel Only
+                {activeTab === 'delivery' ? 'Partners are onboarded by Dairy Admin' : 'Authorized Personnel Only'}
               </p>
             </div>
           )}

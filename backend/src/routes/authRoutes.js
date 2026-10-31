@@ -7,8 +7,9 @@ const router = express.Router();
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Limit each IP to 10 requests per windowMs
-    message: { message: 'Too many requests from this IP, please try again after 15 minutes' }
+    max: 50, // Limit each IP to 50 failed attempts per windowMs
+    skipSuccessfulRequests: true,
+    message: { message: 'Too many failed login attempts, please try again after 15 minutes' }
 });
 
 router.post('/login', authLimiter, validate(loginSchema), login);

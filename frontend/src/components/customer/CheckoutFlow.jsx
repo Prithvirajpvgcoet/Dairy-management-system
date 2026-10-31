@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MapPin, CreditCard, Wallet, Smartphone, ShieldCheck, ArrowLeft, Loader2, CheckCircle2, ChevronRight, QrCode } from 'lucide-react';
+import { MapPin, CreditCard, Wallet, Smartphone, ShieldCheck, ArrowLeft, Loader2, CheckCircle2, ChevronRight, QrCode, Clock } from 'lucide-react';
 import api from '../../api/client';
 
 const CheckoutFlow = () => {

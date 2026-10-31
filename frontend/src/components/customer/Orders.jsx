@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Clock, CheckCircle2, XCircle, Loader2, CreditCard, ShoppingCart } from 'lucide-react';
+import { Package, Clock, CheckCircle2, XCircle, Loader2, CreditCard, ShoppingCart, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 

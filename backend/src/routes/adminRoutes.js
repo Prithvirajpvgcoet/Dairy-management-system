@@ -23,7 +23,8 @@ const {
     getBillingOverview,
     getUpcomingExceptions,
     addManualException,
-    getTomorrowRoutesSummary
+    getTomorrowRoutesSummary,
+    addStaff
 } = require('../controllers/adminController');
 const { list, create, update, remove } = require('../controllers/productController');
 const { getInventory, updateInventory } = require('../controllers/inventoryController');
@@ -48,6 +49,7 @@ router.get('/customers', authorize('ADMIN', 'SUPPORT'), getCustomers);
 // Delivery Boys
 router.get('/delivery-boys', authorize('ADMIN', 'SUPPORT'), getDeliveryBoys);
 router.post('/delivery-boys', authorize('ADMIN', 'SUPPORT'), validate(deliveryBoySchema), addDeliveryBoy);
+router.post('/staff', authorize('ADMIN'), addStaff);
 
 // Routes
 router.post('/assign-route', authorize('ADMIN', 'SUPPORT'), validate(assignRouteSchema), assignRoute);

@@ -23,9 +23,33 @@ const productSchema = z.object({
 });
 
 const deliveryStatusSchema = z.object({
-    customerId: z.number().int().positive("Invalid customer ID"),
-    delivered: z.boolean(),
-    quantity: z.number().optional()
+    customerId: z.coerce.number().int().positive("Invalid customer ID"),
+    status: z.enum(['DELIVERED', 'NOT_DELIVERED', 'CUSTOMER_SKIPPED', 'DELIVERY_FAILED', 'OTHER_EXCEPTION']).optional(),
+    delivered: z.boolean().optional(),
+    actual_quantity: z.coerce.number().min(0).max(100).optional(),
+    quantity: z.coerce.number().min(0).max(100).optional(),
+    gps_latitude: z.coerce.number().min(-90).max(90).nullish(),
+    gps_longitude: z.coerce.number().min(-180).max(180).nullish(),
+    gps_lat: z.coerce.number().min(-90).max(90).nullish(),
+    gps_lng: z.coerce.number().min(-180).max(180).nullish(),
+    exception_reason: z.string().max(300).optional()
+}).transform(data => {
+    const status = data.status || (data.delivered ? 'DELIVERED' : 'NOT_DELIVERED');
+    const delivered = status === 'DELIVERED';
+    const actual_quantity = data.actual_quantity !== undefined ? data.actual_quantity : (data.quantity !== undefined ? data.quantity : 0);
+    const lat = data.gps_latitude !== undefined ? data.gps_latitude : data.gps_lat;
+    const lng = data.gps_longitude !== undefined ? data.gps_longitude : data.gps_lng;
+    return {
+        ...data,
+        status,
+        delivered,
+        actual_quantity,
+        quantity: actual_quantity,
+        gps_latitude: lat,
+        gps_longitude: lng,
+        gps_lat: lat,
+        gps_lng: lng
+    };
 });
 
 const collectPaymentSchema = z.object({

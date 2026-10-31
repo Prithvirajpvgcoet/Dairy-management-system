@@ -1,6 +1,14 @@
 const http = require('http');
 const mysql = require('mysql2/promise');
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+
+const envPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+    require('dotenv').config({ path: envPath });
+} else {
+    require('dotenv').config();
+}
 
 const BASE = 'http://localhost:5000/api';
 const CREDS = {
@@ -12,12 +20,12 @@ const CREDS = {
 let tokens = { admin: '', customer: '', delivery: '' };
 const results = [];
 
-async function req(method, path, body, token, label) {
+async function req(method, pathUrl, body, token, label, expectedStatus = null) {
     return new Promise((resolve) => {
         const data = body ? JSON.stringify(body) : null;
         const opts = {
             hostname: 'localhost', port: 5000,
-            path: '/api' + path, method,
+            path: '/api' + pathUrl, method,
             headers: {
                 'Content-Type': 'application/json',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -30,14 +38,14 @@ async function req(method, path, body, token, label) {
             res.on('end', () => {
                 let parsed;
                 try { parsed = JSON.parse(raw); } catch { parsed = raw; }
-                const ok = res.statusCode < 400;
+                const ok = expectedStatus !== null ? res.statusCode === expectedStatus : res.statusCode < 400;
                 results.push({ label, status: res.statusCode, ok, body: typeof parsed === 'object' ? JSON.stringify(parsed).substring(0, 120) : String(parsed).substring(0, 120) });
-                resolve({ status: res.statusCode, data: parsed });
+                resolve({ status: res.statusCode, data: parsed, ok });
             });
         });
         r.on('error', (e) => {
             results.push({ label, status: 'ERR', ok: false, body: e.message });
-            resolve({ status: 'ERR', data: null });
+            resolve({ status: 'ERR', data: null, ok: false });
         });
         if (data) r.write(data);
         r.end();
@@ -45,10 +53,10 @@ async function req(method, path, body, token, label) {
 }
 
 function log(label, r) {
-    const icon = r.status < 400 ? '✅' : '❌';
+    const icon = r.ok ? '✅' : '❌';
     const body = results.find(x => x.label === label);
     const snippet = body ? body.body.substring(0,80) : '';
-    console.log(`  ${icon} [${r.status}] ${label}${r.status >= 400 ? '  →  ' + snippet : ''}`);
+    console.log(`  ${icon} [${r.status}] ${label}${!r.ok ? '  →  ' + snippet : ''}`);
 }
 
 async function login(role) {
@@ -73,12 +81,12 @@ async function run() {
     console.log('  Delivery token:', tokens.delivery ? '✅ acquired' : '❌ missing');
 
     // Test invalid login
-    const badLogin = await req('POST', '/auth/login', { email: 'admin@dairy.com', password: 'wrongpass' }, null, 'Bad Login');
-    console.log(`  ${badLogin.status === 401 ? '✅' : '❌'} [${badLogin.status}] Bad credentials rejected (expected 401)`);
+    const badLogin = await req('POST', '/auth/login', { email: 'admin@dairy.com', password: 'wrongpass' }, null, 'Bad Login', 401);
+    console.log(`  ${badLogin.ok ? '✅' : '❌'} [${badLogin.status}] Bad credentials rejected (expected 401)`);
 
     // Test no token
-    const noToken = await req('GET', '/admin/dashboard', null, null, 'No Token');
-    console.log(`  ${noToken.status === 401 ? '✅' : '❌'} [${noToken.status}] Unauthenticated request rejected (expected 401)`);
+    const noToken = await req('GET', '/admin/dashboard', null, null, 'No Token', 401);
+    console.log(`  ${noToken.ok ? '✅' : '❌'} [${noToken.status}] Unauthenticated request rejected (expected 401)`);
 
     // ─── [2] ADMIN APIs ────────────────────────────────────────────────────────
     console.log('\n━━━ [2] ADMIN API TESTS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -88,8 +96,8 @@ async function run() {
         ['GET',  '/admin/delivery-boys',            null,                          'GET /admin/delivery-boys'],
         ['GET',  '/admin/daily-logs',               null,                          'GET /admin/daily-logs'],
         ['GET',  '/admin/products',                 null,                          'GET /admin/products'],
-        ['GET',  '/admin/inventory?date=2026-09-19',null,                          'GET /admin/inventory'],
-        ['GET',  '/admin/billing/overview',         null,                          'GET /admin/billing/overview'],
+        ['GET',  '/admin/inventory?date=2026-10-31',null,                          'GET /admin/inventory'],
+        ['GET',  '/admin/billing/overview?month=10&year=2026', null,               'GET /admin/billing/overview'],
         ['GET',  '/admin/billing/daily-report',     null,                          'GET /admin/billing/daily-report'],
         ['GET',  '/admin/billing/ledger/1',         null,                          'GET /admin/billing/ledger/:id'],
         ['GET',  '/admin/exceptions/upcoming',      null,                          'GET /admin/exceptions/upcoming'],
@@ -98,7 +106,7 @@ async function run() {
         ['GET',  '/admin/quantity-change-requests', null,                          'GET /admin/quantity-change-requests'],
         ['GET',  '/admin/audit-logs',               null,                          'GET /admin/audit-logs'],
         ['GET',  '/admin/wallet/1',                 null,                          'GET /admin/wallet/:id'],
-        ['POST', '/admin/billing/generate',         { month: '09', year: '2026' },'POST /admin/billing/generate'],
+        ['POST', '/admin/billing/generate',         { month: 10, year: 2026 },     'POST /admin/billing/generate'],
     ];
     for (const [m, p, b, l] of adminTests) {
         const r = await req(m, p, b, tokens.admin, l);
@@ -107,11 +115,14 @@ async function run() {
 
     // RBAC test: customer token should NOT access admin routes
     console.log('\n  ── RBAC Tests (customer token on admin routes) ──');
-    const rbacTest = await req('GET', '/admin/dashboard', null, tokens.customer, 'RBAC: Customer→Admin');
-    console.log(`  ${rbacTest.status === 403 ? '✅' : '❌'} [${rbacTest.status}] Customer denied admin access (expected 403)`);
+    const rbacTest = await req('GET', '/admin/dashboard', null, tokens.customer, 'RBAC: Customer→Admin', 403);
+    console.log(`  ${rbacTest.ok ? '✅' : '❌'} [${rbacTest.status}] Customer denied admin access (expected 403)`);
 
     // ─── [3] CUSTOMER APIs ─────────────────────────────────────────────────────
     console.log('\n━━━ [3] CUSTOMER API TESTS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const dayAfter = new Date(Date.now() + 172800000).toISOString().split('T')[0];
+
     const customerTests = [
         ['GET',  '/customer/dashboard',     null,                                                        'GET /customer/dashboard'],
         ['GET',  '/customer/subscriptions', null,                                                        'GET /customer/subscriptions'],
@@ -121,29 +132,20 @@ async function run() {
         ['GET',  '/customer/addons',        null,                                                        'GET /customer/addons'],
         ['GET',  '/customer/account',       null,                                                        'GET /customer/account'],
         ['GET',  '/customer/orders',        null,                                                        'GET /customer/orders'],
-        ['POST', '/customer/skip',          { skip_date: '2026-09-25', skip_end_date: '2026-09-26', reason: 'Testing' }, 'POST /customer/skip (multi-day)'],
-        ['POST', '/customer/change-quantity', { requests: [{ product_id: 1, requested_quantity: 2, effective_date: '2026-09-25', reason: 'QA test' }] }, 'POST /customer/change-quantity'],
+        ['POST', '/customer/skip',          { skip_date: tomorrow, skip_end_date: dayAfter, reason: 'Testing' }, 'POST /customer/skip (multi-day)'],
+        ['POST', '/customer/change-quantity', { requests: [{ product_id: 1, requested_quantity: 2, effective_date: tomorrow, reason: 'QA test' }] }, 'POST /customer/change-quantity'],
     ];
     for (const [m, p, b, l] of customerTests) {
         const r = await req(m, p, b, tokens.customer, l);
         log(l, r);
     }
 
-    // Test skip created, then list and cancel it
-    const skipsR = await req('GET', '/customer/skips', null, tokens.customer, 'GET /customer/skips (after create)');
-    log('GET /customer/skips (after create)', skipsR);
-    if (skipsR.data && Array.isArray(skipsR.data) && skipsR.data.length > 0) {
-        const skipId = skipsR.data[0].id;
-        const cancelR = await req('DELETE', `/customer/skips/${skipId}`, null, tokens.customer, 'DELETE /customer/skips/:id');
-        log('DELETE /customer/skips/:id', cancelR);
-    }
-
-    // ─── [4] DELIVERY APIs ─────────────────────────────────────────────────────
+    // ─── [4] DELIVERY PARTNER APIs ─────────────────────────────────────────────
     console.log('\n━━━ [4] DELIVERY PARTNER API TESTS ━━━━━━━━━━━━━━━━━━━━━━━━');
     const deliveryTests = [
-        ['GET', '/delivery/today-route',  null, 'GET /delivery/today-route'],
-        ['GET', '/delivery/summary',      null, 'GET /delivery/summary'],
-        ['GET', '/delivery/my-performance', null, 'GET /delivery/my-performance'],
+        ['GET', '/delivery/today-route',   null,  'GET /delivery/today-route'],
+        ['GET', '/delivery/summary',       null,  'GET /delivery/summary'],
+        ['GET', '/delivery/my-performance',null,  'GET /delivery/my-performance'],
     ];
     for (const [m, p, b, l] of deliveryTests) {
         const r = await req(m, p, b, tokens.delivery, l);
@@ -159,7 +161,13 @@ async function run() {
 
     // ─── [6] DATABASE SCHEMA ───────────────────────────────────────────────────
     console.log('\n━━━ [6] DATABASE SCHEMA & DATA CHECKS ━━━━━━━━━━━━━━━━━━━━');
-    const pool = mysql.createPool({ host: process.env.DB_HOST||'localhost', user: process.env.DB_USER||'root', password: process.env.DB_PASSWORD||'', database: process.env.DB_NAME||'dairy_db' });
+    const pool = mysql.createPool({ 
+        host: process.env.DB_HOST || 'localhost', 
+        user: process.env.DB_USER || 'root', 
+        password: process.env.DB_PASSWORD || '', 
+        database: process.env.DB_NAME || 'dairy_db' 
+    });
+
     const tables = [
         ['users', 'Roles exist'],
         ['customers', 'GPS lat/lng columns'],

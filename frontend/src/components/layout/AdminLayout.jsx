@@ -16,11 +16,17 @@ import {
   Bell,
   Shield
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import NotificationBell from '../common/NotificationBell';
 
 const AdminLayout = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate('/login');
+  };
 
   const menuItems = [
     { name: 'Dashboard', icon: Home, path: '/admin' },
@@ -72,10 +78,13 @@ const AdminLayout = ({ children }) => {
         
         {/* Logout */}
         <div className="p-4 border-t border-gray-100">
-          <Link to="/" className="flex items-center px-3 py-2 text-sm font-semibold text-gray-600 hover:text-red-600 transition-colors">
+          <button 
+            onClick={handleLogout} 
+            className="w-full flex items-center px-3 py-2 text-sm font-semibold text-gray-600 hover:text-red-600 transition-colors bg-transparent border-none cursor-pointer"
+          >
             <LogOut className="w-5 h-5 mr-3 text-gray-400 hover:text-red-600" />
             Logout
-          </Link>
+          </button>
         </div>
       </aside>
 

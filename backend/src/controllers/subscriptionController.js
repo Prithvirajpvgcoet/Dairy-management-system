@@ -338,7 +338,7 @@ const getMySkips = async (req, res) => {
     if (!customer) return res.status(404).json({ message: 'Customer not found' });
 
     const [skips] = await pool.query(
-      `SELECT * FROM delivery_skip_requests WHERE customer_id = ? AND skip_date >= CURDATE() AND status = 'PENDING' ORDER BY skip_date ASC`,
+      `SELECT * FROM delivery_skip_requests WHERE customer_id = ? AND skip_date >= CURDATE() ORDER BY skip_date ASC`,
       [customer.id]
     );
     return res.json(skips);

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Loader2, CheckCircle2, Clock, ChevronRight, BarChart3, Users, AlertCircle, Download, Lock } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../../api/client';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -92,46 +91,21 @@ const MonthlyBilling = () => {
     }
   };
 
-  const handleDownloadPDF = (bill, ledgerData) => {
-    const doc = new jsPDF();
-    const [year, monthNum] = monthStr.split('-');
-    const monthName = MONTHS[parseInt(monthNum) - 1];
-
-    doc.setFontSize(20);
-    doc.setTextColor(13, 71, 161);
-    doc.text('अमराळे Dairy — Monthly Invoice', 20, 22);
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`${monthName} ${year}  |  Customer: ${bill.customer_name}  |  Bill #${bill.id}`, 20, 32);
-    doc.line(20, 37, 190, 37);
-
-    if (ledgerData?.ledger?.length) {
-      const rows = ledgerData.ledger.map(r => [
-        r.record_date?.slice(0, 10) || '—',
-        r.subscription_qty || 0,
-        r.addon_qty || 0,
-        r.actual_qty || 0,
-        r.delivery_status || '—',
-        `₹${parseFloat(r.billable_amount || 0).toFixed(2)}`
-      ]);
-      doc.autoTable({
-        startY: 42,
-        head: [['Date', 'Sub Qty', 'Add-on', 'Actual', 'Status', 'Billable']],
-        body: rows,
-        headStyles: { fillColor: [13, 71, 161] },
-        styles: { fontSize: 9 },
-      });
+  const handleDownloadPDF = async (bill) => {
+    try {
+      const response = await api.get(`/admin/bills/${bill.id}/pdf`, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Dairy_Bill_${bill.month}_${bill.year}_${(bill.customer_name || 'Customer').replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Could not download admin bill PDF:', err);
+      toast.error('Could not download bill PDF');
     }
-
-    const finalY = doc.lastAutoTable?.finalY || 80;
-    doc.setFontSize(12);
-    doc.setTextColor(0);
-    doc.text(`Subscription: ₹${parseFloat(bill.subscription_charge || bill.amount || 0).toFixed(2)}`, 20, finalY + 12);
-    doc.text(`Add-ons:      ₹${parseFloat(bill.addon_charge || 0).toFixed(2)}`, 20, finalY + 22);
-    doc.setFontSize(14);
-    doc.setTextColor(13, 71, 161);
-    doc.text(`TOTAL: ₹${parseFloat(bill.total_amount || bill.amount).toFixed(2)}`, 20, finalY + 36);
-    doc.save(`Amrale-${bill.customer_name}-${monthName}-${year}.pdf`);
   };
 
   const [year, monthNum] = monthStr.split('-');

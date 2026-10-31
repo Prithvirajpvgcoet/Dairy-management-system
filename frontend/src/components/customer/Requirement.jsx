@@ -67,7 +67,7 @@ const Requirement = () => {
       }
 
       if (subRes.status === 'fulfilled') {
-        const subs = subRes.value.data || [];
+        const subs = subRes.value.data?.subscriptions || (Array.isArray(subRes.value.data) ? subRes.value.data : []);
         if (subs.length > 0) {
           const sMap = {};
           subs.forEach(s => { sMap[s.product_id] = s.quantity_per_day; });
@@ -159,6 +159,7 @@ const Requirement = () => {
       await api.post('/customer/addons', {
         product_id: parseInt(addonProductId),
         delivery_date: addonDate,
+        quantity: addonQty,
         addon_quantity: addonQty,
       });
       alert(`✅ Add-on of ${addonQty} units requested for ${addonDate}!`);
@@ -308,7 +309,7 @@ const Requirement = () => {
                 <div key={addon.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                   <div>
                     <p className="text-sm font-bold text-gray-800">{addon.product_name || `Product #${addon.product_id}`}</p>
-                    <p className="text-xs text-gray-500 font-medium">{addon.delivery_date} · +{addon.addon_quantity} {addon.unit}</p>
+                    <p className="text-xs text-gray-500 font-medium">{addon.delivery_date} · +{addon.addon_quantity || addon.quantity} {addon.product_unit || addon.unit || 'L'}</p>
                   </div>
                   <span className="text-sm font-extrabold text-green-700 bg-green-50 px-3 py-1 rounded-lg">₹{parseFloat(addon.total_amount).toFixed(2)}</span>
                 </div>

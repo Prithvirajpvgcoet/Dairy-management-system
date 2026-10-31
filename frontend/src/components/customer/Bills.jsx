@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, CheckCircle2, Lock, Loader2, Clock, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../../api/client';
 
 const Bills = () => {
@@ -8,7 +9,6 @@ const Bills = () => {
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletHistory, setWalletHistory] = useState([]);
   const [showWalletHistory, setShowWalletHistory] = useState(false);
-
 
   useEffect(() => { fetchBills(); }, []);
 
@@ -22,9 +22,12 @@ const Bills = () => {
         setWalletBalance(walletRes.data.balance || 0);
         setWalletHistory(walletRes.data.transactions || []);
       }
-      if (res) setBills(billsRes.data);
+      if (billsRes && billsRes.data) {
+        setBills(billsRes.data);
+      }
     } catch (error) {
       console.error('Failed to fetch bills', error);
+      toast.error('Could not load bills');
     } finally {
       setLoading(false);
     }
@@ -36,18 +39,12 @@ const Bills = () => {
     return date.toLocaleString('default', { month: 'long' });
   };
 
-  
   const handleDownloadPDF = async (bill) => {
     try {
-      // Create a temporary link to download the file directly from backend API
-      const token = localStorage.getItem('token');
-      // Fetch as blob
-      const response = await fetch(`/api/customer/bills/${bill.id}/pdf`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await api.get(`/customer/bills/${bill.id}/pdf`, {
+        responseType: 'blob'
       });
-      if (!response.ok) throw new Error('Failed to download PDF');
-      
-      const blob = await response.blob();
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -56,11 +53,10 @@ const Bills = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Could not download PDF: ' + err.message);
+      console.error('Could not download PDF:', err);
+      toast.error('Could not download invoice PDF');
     }
   };
-
-
 
   if (loading) {
     return <div className="flex-1 flex justify-center items-center h-full min-h-[50vh]"><Loader2 className="w-8 h-8 animate-spin text-[#1551b5]" /></div>;
@@ -73,7 +69,6 @@ const Bills = () => {
   return (
     <div className="md:p-2 bg-slate-50 min-h-full">
       <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
-        
         
         {/* Wallet Section */}
         <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl p-6 shadow-lg text-white mb-6">
@@ -216,7 +211,7 @@ const Bills = () => {
                     <div className="flex justify-between items-center pt-2">
                       <span className="text-base font-extrabold text-gray-900">Total</span>
                       <span className="text-2xl font-extrabold text-[#0D47A1]">
-                        ₹{parseFloat(bill.total_amount || bill.amount).toFixed(2)}
+                        ₹{parseFloat(bill.amount || bill.total_amount || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
