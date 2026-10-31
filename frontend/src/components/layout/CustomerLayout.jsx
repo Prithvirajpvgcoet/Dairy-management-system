@@ -12,7 +12,7 @@ import {
   Droplets
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import api from '../../api/client';
+import api from '../../services/client';
 
 const CustomerLayout = ({ children }) => {
   const location = useLocation();

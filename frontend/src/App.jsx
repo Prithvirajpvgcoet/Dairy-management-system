@@ -8,6 +8,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import DeliveryLayout from './components/layout/DeliveryLayout';
 import CustomerLayout from './components/layout/CustomerLayout';
 import RequireRole from './components/common/RequireRole';
+import { AuthProvider } from './context/AuthContext';
 
 // Admin Components
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -36,62 +37,63 @@ import { Toaster } from 'react-hot-toast';
 function App() {
   return (
     <Router>
-      <Toaster position="top-right" />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<LandingPage/>} />
-        <Route path="/login" element={<Login />} />
+      <AuthProvider>
+        <Toaster position="top-right" />
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage/>} />
+          <Route path="/login" element={<Login />} />
 
-        {/* Protected Routes (Dashboards) */}
-        <Route path="/admin/*" element={
-          <RequireRole roles={['ADMIN', 'INVENTORY_MNGR', 'BILLING_CLERK', 'SUPPORT']}>
-            <AdminLayout>
-              <Routes>
-                <Route path="/" element={<AdminDashboard />} />
-                <Route path="/assign-route" element={<RouteAssignment />} />
-                <Route path="/performance" element={<Performance />} />
-                <Route path="/daily-logs" element={<DailyLogs />} />
-                <Route path="/monthly-billing" element={<MonthlyBilling />} />
-                <Route path="/staff-management" element={<StaffManagement />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/inventory" element={<Inventory />} />
-                <Route path="/exceptions" element={<Exceptions />} />
-                <Route path="/audit-logs" element={<AuditLogs />} />
-                <Route path="/logs" element={<AuditLogs />} />
-              </Routes>
-            </AdminLayout>
-          </RequireRole>
-        } />
-        
-        <Route path="/customer/*" element={
-          <RequireRole roles={['CUSTOMER']}>
-            <CustomerLayout>
-              <Routes>
-                <Route path="/" element={<CustomerDashboard />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/checkout" element={<CheckoutFlow />} />
-                <Route path="/bills" element={<Bills />} />
-                <Route path="/account" element={<Account />} />
-                <Route path="/requirement" element={<Requirement />} />
-              </Routes>
-            </CustomerLayout>
-          </RequireRole>
-        } />
-        
-        <Route path="/delivery/*" element={
-          <RequireRole roles={['DELIVERY_BOY']}>
-            <DeliveryLayout>
-              <Routes>
-                <Route path="/" element={<DeliveryDashboard />} />
-                <Route path="/route" element={<DeliveryDashboard />} />
-                <Route path="/earnings" element={<DeliveryDashboard />} />
-                <Route path="/profile" element={<DeliveryDashboard />} />
-              </Routes>
-            </DeliveryLayout>
-          </RequireRole>
-        } />
-      </Routes>
+          {/* Protected Routes (Dashboards) */}
+          <Route path="/admin/*" element={
+            <RequireRole roles={['ADMIN', 'INVENTORY_MNGR', 'BILLING_CLERK', 'SUPPORT']}>
+              <AdminLayout>
+                <Routes>
+                  <Route path="/" element={<AdminDashboard />} />
+                  <Route path="/assign-route" element={<RouteAssignment />} />
+                  <Route path="/performance" element={<Performance />} />
+                  <Route path="/daily-logs" element={<DailyLogs />} />
+                  <Route path="/monthly-billing" element={<MonthlyBilling />} />
+                  <Route path="/staff-management" element={<StaffManagement />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/customers" element={<Customers />} />
+                  <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/exceptions" element={<Exceptions />} />
+                  <Route path="/audit-logs" element={<AuditLogs />} />
+                </Routes>
+              </AdminLayout>
+            </RequireRole>
+          } />
+
+          <Route path="/customer/*" element={
+            <RequireRole roles={['CUSTOMER']}>
+              <CustomerLayout>
+                <Routes>
+                  <Route path="/" element={<CustomerDashboard />} />
+                  <Route path="/orders" element={<Orders />} />
+                  <Route path="/plans" element={<CheckoutFlow />} />
+                  <Route path="/bills" element={<Bills />} />
+                  <Route path="/account" element={<Account />} />
+                  <Route path="/requirement" element={<Requirement />} />
+                </Routes>
+              </CustomerLayout>
+            </RequireRole>
+          } />
+          
+          <Route path="/delivery/*" element={
+            <RequireRole roles={['DELIVERY_BOY']}>
+              <DeliveryLayout>
+                <Routes>
+                  <Route path="/" element={<DeliveryDashboard />} />
+                  <Route path="/route" element={<DeliveryDashboard />} />
+                  <Route path="/earnings" element={<DeliveryDashboard />} />
+                  <Route path="/profile" element={<DeliveryDashboard />} />
+                </Routes>
+              </DeliveryLayout>
+            </RequireRole>
+          } />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }

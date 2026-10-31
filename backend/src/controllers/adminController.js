@@ -7,82 +7,109 @@ const getDashboard = async (req, res) => {
     try {
         const [[{ totalCustomers }]] = await pool.query('SELECT COUNT(*) as totalCustomers FROM customers');
         const [[{ totalDeliveryBoys }]] = await pool.query('SELECT COUNT(*) as totalDeliveryBoys FROM delivery_boys');
-        const [[{ todayMilk }]] = await pool.query(`SELECT COALESCE(SUM(delivered_quantity),0) as todayMilk FROM deliveries WHERE date = CURDATE()`);
-        const [[{ delivered }]] = await pool.query(`SELECT COUNT(*) as delivered FROM deliveries WHERE date = CURDATE() AND status='DELIVERED'`);
-        const [[{ pendingDeliveries }]] = await pool.query(`SELECT COUNT(*) as pendingDeliveries FROM deliveries WHERE date = CURDATE() AND status='PENDING'`);
-        const [[{ totalRevenue }]] = await pool.query(`SELECT COALESCE(SUM(amount), 0) as totalRevenue FROM bills WHERE status='PAID'`);
+        const [[{ todayMilk }]] = await pool.query(`SELECT COALESCE(SUM(actual_quantity), 0) as todayMilk FROM deliveries WHERE date = CURDATE() AND status = 'DELIVERED'`);
+        const [[{ delivered }]] = await pool.query(`SELECT COUNT(*) as delivered FROM deliveries WHERE date = CURDATE() AND status = 'DELIVERED'`);
+        const [[{ pendingDeliveries }]] = await pool.query(`SELECT COUNT(*) as pendingDeliveries FROM deliveries WHERE date = CURDATE() AND status != 'DELIVERED' AND status != 'CUSTOMER_SKIPPED'`);
+        const [[{ skippedToday }]] = await pool.query(`SELECT COUNT(*) as skippedToday FROM deliveries WHERE date = CURDATE() AND status = 'CUSTOMER_SKIPPED'`);
+        const [[{ totalRevenue }]] = await pool.query(`SELECT COALESCE(SUM(paid_amount), 0) as totalRevenue FROM bills`);
+        const [[{ outstandingDues }]] = await pool.query(`SELECT COALESCE(SUM(amount - paid_amount), 0) as outstandingDues FROM bills WHERE status IN ('FINAL', 'PARTIAL')`);
         const [[{ totalOrders }]] = await pool.query(`SELECT COUNT(*) as totalOrders FROM bills`);
+        const [[{ unassignedCustomers }]] = await pool.query(`
+            SELECT COUNT(*) as unassignedCustomers 
+            FROM customers c 
+            LEFT JOIN delivery_routes dr ON dr.customer_id = c.id 
+            WHERE dr.delivery_boy_id IS NULL
+        `);
+        const [[{ lowStockCount }]] = await pool.query(`
+            SELECT COUNT(*) as lowStockCount FROM inventory WHERE date = CURDATE() AND total_available <= 50
+        `);
 
-        const [ordersByStatusRows] = await pool.query(`SELECT status, COUNT(*) as count FROM deliveries GROUP BY status`);
-        const ordersByStatus = { DELIVERED: 0, PENDING: 0, MISSED: 0 };
-        ordersByStatusRows.forEach(r => { ordersByStatus[r.status] = parseInt(r.count); });
+        // Orders by Status for today
+        const [ordersByStatusRows] = await pool.query(`
+            SELECT status, COUNT(*) as count 
+            FROM deliveries 
+            WHERE date = CURDATE() 
+            GROUP BY status
+        `);
+        const ordersByStatus = { DELIVERED: 0, PENDING: 0, MISSED: 0, SKIPPED: 0 };
+        ordersByStatusRows.forEach(r => {
+            if (r.status === 'DELIVERED') ordersByStatus.DELIVERED = parseInt(r.count, 10);
+            else if (r.status === 'CUSTOMER_SKIPPED') ordersByStatus.SKIPPED = parseInt(r.count, 10);
+            else if (['NOT_DELIVERED', 'DELIVERY_FAILED', 'MISSED'].includes(r.status)) ordersByStatus.MISSED += parseInt(r.count, 10);
+            else ordersByStatus.PENDING += parseInt(r.count, 10);
+        });
 
+        // Top products sold from delivery_items (Single source of truth)
         const [topProducts] = await pool.query(`
-            SELECT p.name, p.unit, COALESCE(SUM(d.delivered_quantity), 0) as sold
+            SELECT p.id, p.name, p.unit, COALESCE(SUM(di.actual_qty), 0) as sold
             FROM products p
-            LEFT JOIN customer_requirements cr ON cr.product_id = p.id
-            LEFT JOIN deliveries d ON d.customer_id = cr.customer_id AND d.status = 'DELIVERED'
+            LEFT JOIN delivery_items di ON di.product_id = p.id
+            LEFT JOIN deliveries d ON di.delivery_id = d.id AND d.status = 'DELIVERED'
             GROUP BY p.id, p.name, p.unit
             ORDER BY sold DESC
             LIMIT 5
         `);
 
+        // Recent billing records
         const [recentOrders] = await pool.query(`
-            SELECT b.id, b.amount, b.status, b.month, b.year, b.bill_type, b.generated_date,
+            SELECT b.id, b.amount, b.paid_amount, b.status, b.month, b.year, b.bill_type, b.generated_date,
                    u.name as customer_name, u.phone
             FROM bills b
             JOIN customers c ON b.customer_id = c.id
             JOIN users u ON c.user_id = u.id
             ORDER BY b.id DESC
-            LIMIT 5
+            LIMIT 6
         `);
 
+        // Recent live delivery activity
         const [recentActivity] = await pool.query(`
             SELECT 
-                CONCAT(u.name, ' - delivery ', d.status) as text,
-                d.date as created_at,
+                CONCAT(u.name, ' - ', d.status) as text,
+                d.delivery_timestamp as created_at,
                 d.status
             FROM deliveries d
             JOIN customers c ON d.customer_id = c.id
             JOIN users u ON c.user_id = u.id
-            ORDER BY d.id DESC
+            WHERE d.date = CURDATE()
+            ORDER BY COALESCE(d.delivery_timestamp, d.id) DESC
             LIMIT 6
         `);
 
-        const [[{ activeToday }]] = await pool.query(`SELECT COUNT(DISTINCT delivery_boy_id) as activeToday FROM deliveries WHERE date = CURDATE()`);
-        const [[{ onDelivery }]] = await pool.query(`SELECT COUNT(DISTINCT delivery_boy_id) as onDelivery FROM deliveries WHERE date = CURDATE() AND status='PENDING'`);
+        const [[{ activeToday }]] = await pool.query(`SELECT COUNT(DISTINCT delivery_boy_id) as activeToday FROM deliveries WHERE date = CURDATE() AND delivery_boy_id IS NOT NULL`);
+        const [[{ onDelivery }]] = await pool.query(`SELECT COUNT(DISTINCT delivery_boy_id) as onDelivery FROM deliveries WHERE date = CURDATE() AND status != 'DELIVERED' AND status != 'CUSTOMER_SKIPPED'`);
 
+        // Real 7-day payments trend
         const [weeklyRevenue] = await pool.query(`
-            SELECT DATE(b.generated_date) as date, COALESCE(SUM(b.amount),0) as revenue
-            FROM bills b
-            WHERE b.generated_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            GROUP BY DATE(b.generated_date)
+            SELECT DATE(created_at) as date, COALESCE(SUM(amount), 0) as revenue
+            FROM payments
+            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            GROUP BY DATE(created_at)
             ORDER BY date ASC
         `);
 
         res.json({
             customers: totalCustomers,
             deliveryBoys: totalDeliveryBoys,
-            todayMilk,
+            todayMilk: parseFloat(todayMilk || 0),
             delivered,
             pendingDeliveries,
-            totalRevenue: parseFloat(totalRevenue),
+            skippedToday,
+            unassignedCustomers,
+            outstandingDues: parseFloat(outstandingDues || 0),
+            lowStockCount,
+            totalRevenue: parseFloat(totalRevenue || 0),
             totalOrders,
             ordersByStatus,
             topProducts,
             recentOrders,
             recentActivity,
-            deliveryPartnerStats: {
-                total: totalDeliveryBoys,
-                active: activeToday,
-                onDelivery,
-                offline: Math.max(0, totalDeliveryBoys - activeToday)
-            },
+            activeToday,
+            onDelivery,
             weeklyRevenue
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message || error.toString() });
+        console.error('getDashboard error:', error);
+        res.status(500).json({ message: 'Server error loading dashboard metrics' });
     }
 };
 

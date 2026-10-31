@@ -43,7 +43,7 @@ const signup = async (req, res) => {
         try {
             await connection.beginTransaction();
 
-            // Task 1.7: Public signup is locked strictly to CUSTOMER role
+            // Public signup is locked strictly to CUSTOMER role
             const userRole = 'CUSTOMER';
 
             // Insert into users table
@@ -60,8 +60,6 @@ const signup = async (req, res) => {
                 [userId, address || 'N/A']
             );
 
-            // New customer created without hardcoded requirement; customer subscribes to plan
-
             await connection.commit();
             const token = generateToken(userId, userRole);
             res.status(201).json({ token, role: userRole, name, message: 'Signup successful' });
@@ -77,4 +75,59 @@ const signup = async (req, res) => {
     }
 };
 
-module.exports = { login, signup };
+const getMe = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [users] = await pool.query('SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?', [userId]);
+        if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+        
+        let profile = { ...users[0] };
+        if (profile.role === 'CUSTOMER') {
+            const [[cust]] = await pool.query('SELECT id as customer_id, address, wallet_balance, gps_lat, gps_lng FROM customers WHERE user_id = ?', [userId]);
+            if (cust) profile = { ...profile, ...cust };
+        } else if (profile.role === 'DELIVERY_BOY') {
+            const [[db]] = await pool.query('SELECT id as delivery_boy_id, salary_type, salary_rate FROM delivery_boys WHERE user_id = ?', [userId]);
+            if (db) profile = { ...profile, ...db };
+        }
+
+        res.json({ user: profile });
+    } catch (error) {
+        console.error('getMe error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+const changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Current password and new password are required' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'New password must be at least 6 characters' });
+        }
+
+        const [[user]] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
+
+        await pool.query(
+            'INSERT INTO audit_log (user_id, action, entity_type, entity_id, notes) VALUES (?, "PASSWORD_CHANGED", "user", ?, "User updated their account password")',
+            [req.user.id, req.user.id]
+        );
+
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('changePassword error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+module.exports = { login, signup, getMe, changePassword };

@@ -34,4 +34,14 @@ app.get('/', (req, res) => {
     res.send('Dairy Management API is running...');
 });
 
+// Global standardized error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Unhandled Application Error:', err);
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({
+        message: err.message || 'Internal server error',
+        code: err.code || 'INTERNAL_ERROR'
+    });
+});
+
 module.exports = app;

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Minus, Plus, Loader2, Save, CalendarX, ShoppingBag, CheckCircle2, X, Droplets } from 'lucide-react';
-import api from '../../api/client';
+import api from '../../services/client';
+import toast from 'react-hot-toast';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 const PRODUCT_IMAGES = {
   'Cow Milk': '/images/product1.png',
@@ -13,6 +15,7 @@ const PRODUCT_IMAGES = {
 
 const Requirement = () => {
   const [loading, setLoading] = useState(true);
+  const [skipToCancel, setSkipToCancel] = useState(null);
   const [saving, setSaving] = useState(false);
   const [products, setProducts] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
@@ -103,7 +106,7 @@ const Requirement = () => {
   };
 
   const handleConfirmQtyChange = async () => {
-    if (!qtyEffectiveDate) return alert('Please select an effective date.');
+    if (!qtyEffectiveDate) return toast.error('Please select an effective date.');
     setSaving(true);
     try {
       const requests = Object.entries(requirements).map(([productId, qty]) => ({
@@ -113,11 +116,11 @@ const Requirement = () => {
         reason: qtyReason
       }));
       await api.post('/customer/change-quantity', { requests });
-      alert('Quantity change request submitted for admin approval!');
+      toast.success('Quantity change request submitted for admin approval!');
       setQtyModal(false);
       fetchAll();
     } catch (err) {
-      alert('Failed to submit request.');
+      toast.error('Failed to submit request.');
     } finally {
       setSaving(false);
     }
@@ -125,35 +128,36 @@ const Requirement = () => {
 
 
   const handleSkipSubmit = async () => {
-    if (!skipDate) return alert('Please select a start date to skip.');
+    if (!skipDate) return toast.error('Please select a start date to skip.');
     setSubmittingSkip(true);
     try {
       await api.post('/customer/skip', { skip_date: skipDate, skip_end_date: skipEndDate || skipDate, reason: skipReason });
       const msg = skipEndDate && skipEndDate !== skipDate ? `Deliveries from ${skipDate} to ${skipEndDate} have been skipped.` : `Delivery on ${skipDate} has been skipped.`;
-      alert(`⏭ ${msg}`);
+      toast.success(msg);
       setSkipModal(false);
       setSkipDate(''); setSkipEndDate(''); setSkipReason('');
       fetchAll();
     } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
+      toast.error(err.response?.data?.message || err.message);
     } finally {
       setSubmittingSkip(false);
     }
   };
 
   const handleCancelSkip = async (id) => {
-    if (!window.confirm('Are you sure you want to cancel this skip?')) return;
+    setSkipToCancel(id);
+    return;
     try {
       await api.delete(`/customer/skips/${id}`);
-      alert('Skip cancelled successfully.');
+      toast.success('Skip cancelled successfully.');
       fetchAll();
     } catch (e) {
-      alert('Failed to cancel skip.');
+      toast.error('Failed to cancel skip.');
     }
   };
 
   const handleAddonSubmit = async () => {
-    if (!addonProductId || !addonDate) return alert('Select product and date.');
+    if (!addonProductId || !addonDate) return toast.error('Select product and date.');
     setSubmittingAddon(true);
     try {
       await api.post('/customer/addons', {
@@ -162,12 +166,12 @@ const Requirement = () => {
         quantity: addonQty,
         addon_quantity: addonQty,
       });
-      alert(`✅ Add-on of ${addonQty} units requested for ${addonDate}!`);
+      toast.success(`Add-on of ${addonQty} units requested for ${addonDate}!`);
       setAddonModal(false);
       setAddonProductId(''); setAddonDate(''); setAddonQty(1);
       fetchAll();
     } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
+      toast.error(err.response?.data?.message || err.message);
     } finally {
       setSubmittingAddon(false);
     }
@@ -393,6 +397,15 @@ const Requirement = () => {
           </div>
         </div>
       )}
+    
+      <ConfirmDialog
+        isOpen={Boolean(skipToCancel)}
+        title="Cancel Delivery Pause"
+        message="Are you sure you want to cancel this scheduled delivery skip?"
+        confirmText="Cancel Skip"
+        onConfirm={executeCancelSkip}
+        onCancel={() => setSkipToCancel(null)}
+      />
     </div>
   );
 };

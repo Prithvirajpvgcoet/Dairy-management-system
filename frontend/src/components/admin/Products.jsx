@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Loader2, Save, X, Edit, Trash2 } from 'lucide-react';
-import api from '../../api/client';
+import api from '../../services/client';
+import toast from 'react-hot-toast';
+import ConfirmDialog from '../common/ConfirmDialog';
 
-import toast from 'react-hot-toast'; // For notifications (assuming it's available or we can just use alert)
+
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -61,7 +63,8 @@ const Products = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
+    setProductToDelete(id);
+    return;
     try {
       const res = await api.delete(`/admin/products/${id}`);
       if (res) {
@@ -202,6 +205,16 @@ const Products = () => {
           </div>
         </div>
       )}
+    
+      <ConfirmDialog
+        isOpen={Boolean(productToDelete)}
+        title="Deactivate Product"
+        message="Are you sure you want to remove this product from the inventory catalog?"
+        confirmText="Remove Product"
+        isDanger={true}
+        onConfirm={executeDeleteProduct}
+        onCancel={() => setProductToDelete(null)}
+      />
     </div>
   );
 };

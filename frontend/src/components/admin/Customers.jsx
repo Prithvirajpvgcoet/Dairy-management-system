@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Search, MapPin, Package, UserCheck, Loader2 } from 'lucide-react';
-import api from '../../api/client';
+import toast from 'react-hot-toast';
+import api from '../../services/client';
 
 
 const Customers = () => {
@@ -14,15 +15,15 @@ const Customers = () => {
   const [walletDesc, setWalletDesc] = useState('');
   
   const handleAddCredit = async () => {
-    if (!walletAmount) return alert('Enter amount');
+    if (!walletAmount) return toast.error('Please enter an amount');
     try {
       await api.post('/admin/wallet/credit', { customer_id: walletCustId, amount: walletAmount, description: walletDesc });
-      alert('Credit added to wallet');
+      toast.success('Credit added to customer wallet!');
       setWalletModal(false);
       setWalletAmount(''); setWalletDesc('');
       fetchCustomers();
     } catch (e) {
-      alert('Failed to add credit');
+      toast.error('Failed to add credit');
     }
   };
 
@@ -51,10 +52,10 @@ const Customers = () => {
   const handleQtyRequest = async (id, action, note) => {
     try {
       await api.put(`/admin/quantity-change-requests/${id}`, { action, admin_note: note });
-      alert(`Request ${action === 'APPROVE' ? 'Approved' : 'Rejected'}`);
+      toast.success(`Request ${action === 'APPROVE' ? 'Approved' : 'Rejected'}`);
       fetchCustomers();
     } catch (error) {
-      alert('Action failed');
+      toast.error('Action failed: ' + (error.response?.data?.message || error.message));
     }
   };
 

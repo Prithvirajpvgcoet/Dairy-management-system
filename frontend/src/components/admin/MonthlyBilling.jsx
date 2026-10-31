@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Loader2, CheckCircle2, Clock, ChevronRight, BarChart3, Users, AlertCircle, Download, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../../api/client';
+import api from '../../services/client';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -16,6 +17,7 @@ const MonthlyBilling = () => {
   const [ledger, setLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [finalizing, setFinalizing] = useState(null);
+  const [billToFinalize, setBillToFinalize] = useState(null);
 
   useEffect(() => { fetchOverview(); }, [monthStr]);
 
@@ -49,15 +51,15 @@ const MonthlyBilling = () => {
       const [year, monthNum] = monthStr.split('-');
       await api.post(`/admin/billing/generate?month=${monthNum}&year=${year}`);
       await fetchOverview();
-      alert(`✅ Draft bills generated for ${MONTHS[parseInt(monthNum)-1]} ${year}`);
+      toast.success(`Draft bills generated for ${MONTHS[parseInt(monthNum)-1]} ${year}`);
     } catch (err) {
       // Fallback to old endpoint
       try {
         const [year, monthNum] = monthStr.split('-');
         await api.post(`/admin/generate-bills?month=${MONTHS[parseInt(monthNum)-1]}&year=${year}`);
         await fetchOverview();
-        alert('Bills generated!');
-      } catch (e) { alert('Failed: ' + (e.response?.data?.message || e.message)); }
+        toast.success('Bills generated!');
+      } catch (e) { toast.error('Failed: ' + (e.response?.data?.message || e.message)); }
     } finally {
       setGenerating(false);
     }
@@ -78,14 +80,16 @@ const MonthlyBilling = () => {
   };
 
   const handleFinalize = async (bill) => {
-    if (!window.confirm(`Finalize bill for ${bill.customer_name}? This cannot be undone.`)) return;
+    // Confirm handled via ConfirmDialog modal
+    setBillToFinalize(bill);
+    return;
     setFinalizing(bill.id);
     try {
       await api.post(`/admin/billing/finalize/${bill.id}`);
       await fetchOverview();
       if (selectedBill?.id === bill.id) setSelectedBill({ ...selectedBill, status: 'FINAL' });
     } catch (err) {
-      alert('Failed to finalize: ' + (err.response?.data?.message || err.message));
+      toast.error('Failed to finalize: ' + (err.response?.data?.message || err.message));
     } finally {
       setFinalizing(null);
     }
@@ -335,6 +339,15 @@ const MonthlyBilling = () => {
         </div>
 
       </div>
+    
+      <ConfirmDialog
+        isOpen={Boolean(billToFinalize)}
+        title="Finalize Monthly Bill"
+        message={`Are you sure you want to finalize the bill for ${billToFinalize?.customer_name}? Once finalized, the amount is locked.`}
+        confirmText="Finalize Bill"
+        onConfirm={executeFinalize}
+        onCancel={() => setBillToFinalize(null)}
+      />
     </div>
   );
 };
