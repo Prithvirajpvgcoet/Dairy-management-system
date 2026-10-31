@@ -73,7 +73,7 @@ async function run() {
             console.log('  Admin token acquired ✅');
         } else {
             console.log('  Admin login FAILED - trying common passwords...');
-            for (const pwd of ['admin123', 'password', '123456', 'admin']) {
+            for (const pwd of ['Admin@123', 'password', '123456', 'admin']) {
                 const r2 = await req('POST', '/auth/login', { email: users[0].email, password: pwd }, null, `Admin Login attempt (${pwd})`);
                 if (r2.data && r2.data.token) { adminToken = r2.data.token; console.log(`  Got token with pwd: ${pwd} ✅`); break; }
             }

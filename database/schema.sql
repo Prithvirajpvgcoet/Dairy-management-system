@@ -103,6 +103,3 @@ CREATE TABLE bills (
     status ENUM('PAID', 'PENDING') DEFAULT 'PENDING',
     FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
-
--- Seed pre-defined Admin User
-INSERT IGNORE INTO users (name, phone, email, password, role) VALUES ('Super Admin', '9999999999', 'admin@dairy.com', 'admin123', 'ADMIN');

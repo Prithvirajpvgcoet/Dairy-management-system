@@ -52,8 +52,9 @@ const seedDeliveryBoys = async () => {
         // Seed Admin
         const [adminExists] = await pool.query('SELECT id FROM users WHERE email = ?', ['admin@dairy.com']);
         if (adminExists.length === 0) {
+            const adminPass = process.env.ADMIN_PASSWORD || 'Admin@1234';
             const adminSalt = await bcrypt.genSalt(10);
-            const adminHashed = await bcrypt.hash('admin123', adminSalt);
+            const adminHashed = await bcrypt.hash(adminPass, adminSalt);
             await pool.query(
                 'INSERT INTO users (name, phone, email, password, role) VALUES (?, ?, ?, ?, "ADMIN")',
                 ['Super Admin', '9999999999', 'admin@dairy.com', adminHashed]
@@ -63,7 +64,7 @@ const seedDeliveryBoys = async () => {
             console.log("Admin admin@dairy.com already exists.");
         }
 
-        console.log("Seeding complete. Admin login is admin@dairy.com / admin123");
+        console.log("Seeding complete. Admin login is admin@dairy.com / " + (process.env.ADMIN_PASSWORD || 'Admin@1234'));
     } catch (error) {
         console.error("Error seeding delivery boys:", error);
     } finally {

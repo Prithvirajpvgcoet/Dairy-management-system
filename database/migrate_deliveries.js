@@ -1,12 +1,13 @@
 const mysql = require('mysql2/promise');
+require('dotenv').config();
 
 async function runMigration() {
     try {
         const connection = await mysql.createConnection({
-            host: 'localhost',
-            user: 'root',
-            password: 'Prxthvi@100',
-            database: 'dairy_db'
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'dairy_db'
         });
 
         await connection.query('ALTER TABLE deliveries ADD UNIQUE(customer_id, delivery_boy_id, date);');

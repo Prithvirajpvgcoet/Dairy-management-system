@@ -2,8 +2,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/auth/Login';
-import CheckoutPage from './pages/CheckoutPage';
-import PaymentPage from './pages/PaymentPage';
 
 // Layouts
 import AdminLayout from './components/layout/AdminLayout';
@@ -42,8 +40,6 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={<LandingPage/>} />
         <Route path="/login" element={<Login />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/payment" element={<PaymentPage />} />
 
         {/* Protected Routes (Dashboards) */}
         <Route path="/admin/*" element={

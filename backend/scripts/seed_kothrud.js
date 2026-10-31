@@ -8,7 +8,7 @@ async function seedKothrudCustomers() {
         host: process.env.DB_HOST || 'localhost', 
         user: process.env.DB_USER || 'root', 
         password: process.env.DB_PASSWORD || '', 
-        database: process.env.DB_NAME || 'dairy_app' 
+        database: process.env.DB_NAME || 'dairy_db' 
     });
 
     try {
