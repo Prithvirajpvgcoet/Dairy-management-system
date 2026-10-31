@@ -1297,7 +1297,50 @@ const optimizeRouteByDistance = async (req, res) => {
     }
 };
 
+
+const getMessages = async (req, res) => {
+    try {
+        const { kind, status } = req.query;
+        let query = 'SELECT * FROM contact_messages WHERE 1=1';
+        const params = [];
+
+        if (kind) {
+            query += ' AND kind = ?';
+            params.push(kind);
+        }
+        if (status) {
+            query += ' AND status = ?';
+            params.push(status);
+        }
+        query += ' ORDER BY created_at DESC';
+
+        const [rows] = await pool.query(query, params);
+        res.json(rows);
+    } catch (error) {
+        console.error('getMessages error:', error);
+        res.status(500).json({ message: 'Failed to fetch messages' });
+    }
+};
+
+const updateMessageStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        if (!['NEW', 'IN_PROGRESS', 'CLOSED'].includes(status)) {
+            return res.status(400).json({ message: 'Invalid status' });
+        }
+
+        await pool.query('UPDATE contact_messages SET status = ? WHERE id = ?', [status, id]);
+        res.json({ success: true, message: 'Message status updated' });
+    } catch (error) {
+        console.error('updateMessageStatus error:', error);
+        res.status(500).json({ message: 'Failed to update message status' });
+    }
+};
+
 module.exports = {
+  getMessages,
+  updateMessageStatus,
   generateDailyDeliveries,
   reorderRoute,
   optimizeRouteByDistance,

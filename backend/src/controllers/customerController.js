@@ -430,7 +430,109 @@ const downloadBillPDF = async (req, res) => {
     }
 };
 
+
+const subscribePlan = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const userId = req.user.id;
+        const { planId, startDate, deliverySlot } = req.body;
+
+        if (!planId) {
+            return res.status(400).json({ message: 'Plan ID is required' });
+        }
+
+        const [customers] = await connection.query(
+            'SELECT c.id, u.name, u.phone, c.address, dr.delivery_boy_id FROM customers c JOIN users u ON c.user_id = u.id LEFT JOIN delivery_routes dr ON c.id = dr.customer_id WHERE c.user_id = ?',
+            [userId]
+        );
+        if (customers.length === 0) {
+            return res.status(404).json({ message: 'Customer profile not found' });
+        }
+        const customer = customers[0];
+
+        const [plans] = await connection.query('SELECT * FROM subscription_plans WHERE id = ?', [planId]);
+        if (plans.length === 0) {
+            return res.status(404).json({ message: 'Subscription plan not found' });
+        }
+        const plan = plans[0];
+
+        const [items] = await connection.query(
+            'SELECT product_id, quantity_per_day FROM subscription_plan_items WHERE plan_id = ?',
+            [planId]
+        );
+
+        if (items.length === 0 && !plan.is_custom) {
+            return res.status(400).json({ message: 'Plan has no configured products' });
+        }
+
+        const { todayIST, addDays } = require('../utils/date');
+        const start = startDate || addDays(todayIST(), 1);
+
+        await connection.beginTransaction();
+
+        if (deliverySlot) {
+            await connection.query('UPDATE customers SET delivery_slot = ? WHERE id = ?', [deliverySlot, customer.id]);
+        }
+
+        for (const item of items) {
+            await connection.query(
+                "UPDATE subscriptions SET status = 'CANCELLED' WHERE customer_id = ? AND product_id = ? AND status = 'ACTIVE'",
+                [customer.id, item.product_id]
+            );
+
+            const [pRows] = await connection.query('SELECT price_per_unit FROM products WHERE id = ?', [item.product_id]);
+            const price = pRows[0]?.price_per_unit || 0;
+
+            await connection.query(
+                "INSERT INTO subscriptions (customer_id, product_id, quantity_per_day, price_per_unit, start_date, status, delivery_address) VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?)",
+                [customer.id, item.product_id, item.quantity_per_day, price, start, customer.address || 'Pune']
+            );
+        }
+
+        const hasRoute = Boolean(customer.delivery_boy_id);
+        if (!hasRoute) {
+            await connection.query(
+                'INSERT INTO notifications (user_id, title, message) VALUES (1, ?, ?)',
+                [
+                    'Unassigned Route Alert',
+                    `Customer ${customer.name} (Phone: ${customer.phone}) subscribed to plan "${plan.name}". Please assign a delivery partner.`
+                ]
+            );
+        }
+
+        await connection.commit();
+
+        try {
+            const { generateForDate } = require('../services/deliveryGenerator');
+            const tomorrow = addDays(todayIST(), 1);
+            if (start <= tomorrow) {
+                await generateForDate(tomorrow);
+            }
+        } catch (genErr) {
+            console.warn('Delivery generator hook note:', genErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully subscribed to ${plan.name}!`,
+            planName: plan.name,
+            startDate: start,
+            hasRoute: hasRoute,
+            routeMessage: hasRoute 
+                ? 'Your daily deliveries are scheduled and active.' 
+                : 'Delivery starts once your local route is confirmed by our operations team.'
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('subscribePlan error:', error);
+        res.status(500).json({ message: 'Failed to activate subscription plan' });
+    } finally {
+        connection.release();
+    }
+};
+
 module.exports = {
+  subscribePlan,
   downloadBillPDF,
   getMyWallet,
   requestQuantityChange, getDashboard, updateRequirements, getOrders, getBills, getAccount, checkoutSubscription, checkoutOnetime };

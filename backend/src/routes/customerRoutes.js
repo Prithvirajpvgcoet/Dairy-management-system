@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDashboard, updateRequirements, requestQuantityChange, getOrders, getBills, getAccount, checkoutSubscription, checkoutOnetime, getMyWallet, downloadBillPDF } = require('../controllers/customerController');
+const { getDashboard, updateRequirements, requestQuantityChange, getOrders, getBills, getAccount, checkoutSubscription, checkoutOnetime, getMyWallet, downloadBillPDF, subscribePlan } = require('../controllers/customerController');
 const subscriptionController = require('../controllers/subscriptionController');
 const { protect } = require('../middlewares/authMiddleware');
 const { authorize } = require('../middlewares/roleMiddleware');
@@ -15,6 +15,7 @@ router.post('/requirements', validate(requirementsSchema), updateRequirements);
 router.post('/change-quantity', requestQuantityChange);
 router.post('/checkout-subscription', checkoutSubscription); // No body needed
 router.post('/checkout-onetime', validate(checkoutOnetimeSchema), checkoutOnetime);
+router.post('/subscribe-plan', subscribePlan);
 router.get('/orders', getOrders);
 router.get('/bills', getBills);
 router.get('/bills/:id/pdf', downloadBillPDF);
@@ -32,4 +33,4 @@ router.delete('/skips/:id', subscriptionController.cancelSkip);
 router.post('/addons',                subscriptionController.requestAddon);
 router.get('/addons',                 subscriptionController.getMyAddons);
 
-module.exports = router;
+module.exports = router;

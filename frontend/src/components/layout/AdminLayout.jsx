@@ -10,6 +10,7 @@ import {
   LogOut,
   AlertTriangle,
   Shield,
+  MessageSquare,
   Menu,
   X
 } from 'lucide-react';
@@ -17,14 +18,15 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import NotificationBell from '../common/NotificationBell';
 
 const ROLE_PERMISSIONS = {
-  ADMIN: ['Dashboard', 'Exceptions', 'Route Assignment', 'Performance', 'Daily Logs', 'Monthly Billing', 'Staff Management', 'Inventory', 'Products', 'Customers', 'Audit Logs'],
+  ADMIN: ['Dashboard', 'Messages & Support', 'Exceptions', 'Route Assignment', 'Performance', 'Daily Logs', 'Monthly Billing', 'Staff Management', 'Inventory', 'Products', 'Customers', 'Audit Logs'],
   INVENTORY_MNGR: ['Dashboard', 'Inventory', 'Products', 'Daily Logs'],
   BILLING_CLERK: ['Dashboard', 'Monthly Billing', 'Daily Logs', 'Exceptions'],
-  SUPPORT: ['Dashboard', 'Customers', 'Exceptions', 'Route Assignment', 'Performance']
+  SUPPORT: ['Dashboard', 'Messages & Support', 'Customers', 'Exceptions', 'Route Assignment', 'Performance']
 };
 
 const ALL_MENU_ITEMS = [
   { name: 'Dashboard', icon: Home, path: '/admin' },
+  { name: 'Messages & Support', icon: MessageSquare, path: '/admin/messages' },
   { name: 'Exceptions', icon: AlertTriangle, path: '/admin/exceptions' },
   { name: 'Route Assignment', icon: MapPin, path: '/admin/assign-route' },
   { name: 'Performance', icon: Users, path: '/admin/performance' },

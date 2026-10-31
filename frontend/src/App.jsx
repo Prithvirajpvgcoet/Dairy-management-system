@@ -1,9 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
+
+// Public Pages
+import HomePage from './pages/HomePage';
+import ProductsPage from './pages/ProductsPage';
+import SubscriptionsPage from './pages/SubscriptionsPage';
+import OurStoryPage from './pages/OurStoryPage';
+import QualityPage from './pages/QualityPage';
+import ContactPage from './pages/ContactPage';
 import Login from './pages/auth/Login';
 
-// Layouts
+// Layouts & Auth
 import AdminLayout from './components/layout/AdminLayout';
 import DeliveryLayout from './components/layout/DeliveryLayout';
 import CustomerLayout from './components/layout/CustomerLayout';
@@ -22,15 +29,18 @@ import Customers from './components/admin/Customers';
 import Inventory from './components/admin/Inventory';
 import Exceptions from './components/admin/Exceptions';
 import AuditLogs from './components/admin/AuditLogs';
+import SupportMessages from './components/admin/SupportMessages';
 
+// Customer Components
 import CustomerDashboard from './components/customer/CustomerDashboard';
-import DeliveryDashboard from './components/deliveryBoy/DeliveryDashboard';
-
 import Orders from './components/customer/Orders';
 import Requirement from './components/customer/Requirement';
 import Bills from './components/customer/Bills';
 import Account from './components/customer/Account';
 import CheckoutFlow from './components/customer/CheckoutFlow';
+
+// Delivery Components
+import DeliveryDashboard from './components/deliveryBoy/DeliveryDashboard';
 
 import { Toaster } from 'react-hot-toast';
 
@@ -40,16 +50,24 @@ function App() {
       <AuthProvider>
         <Toaster position="top-right" />
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage/>} />
+          {/* Public 5-Page Brand Website */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/our-story" element={<OurStoryPage />} />
+          <Route path="/quality" element={<QualityPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+
+          {/* Authentication */}
           <Route path="/login" element={<Login />} />
 
-          {/* Protected Routes (Dashboards) */}
+          {/* Protected Routes (Admin & Management) */}
           <Route path="/admin/*" element={
             <RequireRole roles={['ADMIN', 'INVENTORY_MNGR', 'BILLING_CLERK', 'SUPPORT']}>
               <AdminLayout>
                 <Routes>
                   <Route path="/" element={<AdminDashboard />} />
+                  <Route path="/messages" element={<SupportMessages />} />
                   <Route path="/assign-route" element={<RouteAssignment />} />
                   <Route path="/performance" element={<Performance />} />
                   <Route path="/daily-logs" element={<DailyLogs />} />
@@ -65,6 +83,7 @@ function App() {
             </RequireRole>
           } />
 
+          {/* Protected Routes (Customer) */}
           <Route path="/customer/*" element={
             <RequireRole roles={['CUSTOMER']}>
               <CustomerLayout>
@@ -80,6 +99,7 @@ function App() {
             </RequireRole>
           } />
           
+          {/* Protected Routes (Delivery Partner) */}
           <Route path="/delivery/*" element={
             <RequireRole roles={['DELIVERY_BOY']}>
               <DeliveryLayout>

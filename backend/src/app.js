@@ -9,7 +9,8 @@ const customerRoutes = require('./routes/customerRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
-const productController = require('./controllers/productController');
+const publicRoutes = require('./routes/publicRoutes');
+const publicController = require('./controllers/publicController');
 
 const app = express();
 
@@ -19,9 +20,16 @@ app.use(cors({
     credentials: true 
 }));
 app.use(express.json()); // Parses JSON bodies
-app.get('/api/products', productController.listPublic);
+
+// Public endpoints aliases
+app.get('/api/products', publicController.getProducts);
+app.get('/api/plans', publicController.getPlans);
+app.get('/api/faqs', publicController.getFaqs);
+app.post('/api/contact', publicController.submitContact);
+app.get('/api/track-order/:query', publicController.trackOrder);
 
 // Mount Routes
+app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/customer', customerRoutes);
