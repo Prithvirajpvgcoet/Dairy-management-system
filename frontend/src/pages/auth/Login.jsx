@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogIn, UserPlus, ShieldCheck, Truck, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/client';
 
 const Login = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('customer'); // 'customer', 'delivery', 'admin'
+  const [searchParams] = useSearchParams();
+  const roleParam = searchParams.get('role');
+  const initialRole = roleParam === 'admin' ? 'admin' : (roleParam === 'delivery' ? 'delivery' : 'customer');
+  
+  const [activeTab, setActiveTab] = useState(initialRole); // 'customer', 'delivery', 'admin'
   const [isSignup, setIsSignup] = useState(false);
   
+  useEffect(() => {
+    const r = searchParams.get('role');
+    if (r === 'admin') setActiveTab('admin');
+    else if (r === 'delivery') setActiveTab('delivery');
+    else if (r === 'customer') setActiveTab('customer');
+  }, [searchParams]);
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
