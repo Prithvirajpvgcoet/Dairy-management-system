@@ -79,19 +79,24 @@ const MonthlyBilling = () => {
     }
   };
 
-  const handleFinalize = async (bill) => {
-    // Confirm handled via ConfirmDialog modal
+  const handleFinalize = (bill) => {
     setBillToFinalize(bill);
-    return;
-    setFinalizing(bill.id);
+  };
+
+  const executeFinalize = async () => {
+    if (!billToFinalize) return;
+    const billId = billToFinalize.id;
+    setFinalizing(billId);
     try {
-      await api.post(`/admin/billing/finalize/${bill.id}`);
+      await api.post(`/admin/billing/finalize/${billId}`);
+      toast.success(`Bill #${billId} finalized successfully.`);
       await fetchOverview();
-      if (selectedBill?.id === bill.id) setSelectedBill({ ...selectedBill, status: 'FINAL' });
+      if (selectedBill?.id === billId) setSelectedBill({ ...selectedBill, status: 'FINAL' });
     } catch (err) {
       toast.error('Failed to finalize: ' + (err.response?.data?.message || err.message));
     } finally {
       setFinalizing(null);
+      setBillToFinalize(null);
     }
   };
 

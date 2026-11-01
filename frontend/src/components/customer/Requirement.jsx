@@ -144,15 +144,20 @@ const Requirement = () => {
     }
   };
 
-  const handleCancelSkip = async (id) => {
+  const handleCancelSkip = (id) => {
     setSkipToCancel(id);
-    return;
+  };
+
+  const executeCancelSkip = async () => {
+    if (!skipToCancel) return;
     try {
-      await api.delete(`/customer/skips/${id}`);
+      await api.delete(`/customer/skips/${skipToCancel}`);
       toast.success('Skip cancelled successfully.');
       fetchAll();
     } catch (e) {
       toast.error('Failed to cancel skip.');
+    } finally {
+      setSkipToCancel(null);
     }
   };
 

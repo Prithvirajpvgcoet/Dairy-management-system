@@ -12,6 +12,7 @@ const Products = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -62,16 +63,22 @@ const Products = () => {
     setShowAddModal(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     setProductToDelete(id);
-    return;
+  };
+
+  const executeDeleteProduct = async () => {
+    if (!productToDelete) return;
     try {
-      const res = await api.delete(`/admin/products/${id}`);
+      const res = await api.delete(`/admin/products/${productToDelete}`);
       if (res) {
+        toast.success('Product deleted successfully');
         fetchProducts();
       }
     } catch (error) {
-      console.error("Failed to delete product:", error);
+      toast.error('Failed to delete product');
+    } finally {
+      setProductToDelete(null);
     }
   };
 

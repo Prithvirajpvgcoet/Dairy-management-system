@@ -1,24 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { 
-  CheckCircle2, ChevronRight, Sparkles, Clock, Calendar, 
-  MapPin, ShieldCheck, ArrowRight, HelpCircle, AlertCircle 
-} from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CheckCircle2, ChevronRight, Clock, Calendar, Check, ArrowRight } from 'lucide-react';
 import PublicLayout from '../components/layout/PublicLayout';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 
+const SUB_TABS = ['Milk Plans', 'Curd & Yogurt', 'Paneer', 'Ghee', 'Custom Plan'];
+
 export default function SubscriptionsPage() {
-  const [plans, setPlans] = useState([]);
-  const [faqs, setFaqs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('Milk Plans');
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Modal form states
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
@@ -30,44 +26,59 @@ export default function SubscriptionsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/plans').catch(() => ({ data: [] })),
-      api.get('/faqs').catch(() => ({ data: [] }))
-    ]).then(([planRes, faqRes]) => {
-      setPlans(planRes.data || []);
-      setFaqs(faqRes.data || []);
-      setLoading(false);
-
-      // Auto-open modal if plan param in URL
-      const planParam = searchParams.get('select') || searchParams.get('plan');
-      if (planParam && planRes.data) {
-        const found = planRes.data.find(p => p.id === parseInt(planParam));
-        if (found) {
-          handleChoosePlan(found);
-        }
-      }
-    });
-  }, [searchParams]);
+  const plans = [
+    {
+      id: 1,
+      name: 'Starter Plan',
+      tagline: 'Perfect for individuals',
+      icon: '🥛',
+      desc: '1 L Cow Milk Daily',
+      price: 1500,
+      is_popular: false
+    },
+    {
+      id: 2,
+      name: 'Standard Plan',
+      tagline: 'Most Popular',
+      icon: '🥛',
+      desc: '2 L Cow Milk Daily',
+      price: 2800,
+      is_popular: true
+    },
+    {
+      id: 3,
+      name: 'Premium Plan',
+      tagline: 'For large families',
+      icon: '🥛',
+      desc: '3 L Cow Milk Daily',
+      price: 3900,
+      is_popular: false
+    },
+    {
+      id: 4,
+      name: 'Custom Plan',
+      tagline: 'Your choice, your way',
+      icon: '📦',
+      desc: 'Select products & quantity',
+      price: null,
+      is_custom: true
+    }
+  ];
 
   const handleChoosePlan = (plan) => {
     if (plan.is_custom) {
-      if (!user) {
-        navigate('/login?next=/customer/requirement');
-      } else {
-        navigate('/customer/requirement');
-      }
+      if (!user) navigate('/login?next=/customer/requirement');
+      else navigate('/customer/requirement');
       return;
     }
 
     if (!user) {
-      // Direct visitor to login/signup with return redirect
       navigate(`/login?next=/subscriptions?select=${plan.id}`);
       return;
     }
 
     if (user.role !== 'CUSTOMER') {
-      toast.error('Only customer accounts can activate daily subscriptions');
+      toast.error('Only customers can activate milk subscriptions');
       return;
     }
 
@@ -84,18 +95,8 @@ export default function SubscriptionsPage() {
         startDate,
         deliverySlot
       });
-
       toast.success(res.data.message || 'Subscription activated successfully!');
       setConfirmModalOpen(false);
-
-      if (!res.data.hasRoute) {
-        toast((t) => (
-          <span className="text-xs">
-            📍 <b>Local Route Confirmation:</b> Our operations team will assign your morning delivery partner shortly.
-          </span>
-        ), { duration: 6000, icon: 'ℹ️' });
-      }
-
       navigate('/customer/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to activate subscription');
@@ -106,181 +107,163 @@ export default function SubscriptionsPage() {
 
   return (
     <PublicLayout>
-      {/* ── Page Header ── */}
-      <div className="bg-white border-b border-slate-200 py-12 sm:py-16 text-center">
-        <div className="max-w-3xl mx-auto px-4">
-          <span className="text-xs font-bold text-[#0D47A1] uppercase tracking-wider">
-            Daily Doorstep Deliveries
-          </span>
-          <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight mt-2">
-            Flexible Milk Subscriptions
-          </h1>
-          <p className="text-base text-slate-600 mt-3 leading-relaxed">
-            Freshly milked, chilled to 4°C, and delivered to your doorstep every morning by 7:00 AM. 
-            Pause or skip dates anytime with 1 tap. Month-end bills calculate strictly what was delivered.
-          </p>
-        </div>
-      </div>
-
-      {/* ── Plans Grid ── */}
-      <div className="py-16 bg-slate-50">
+      {/* ── Page Header (Mockup exact) ── */}
+      <div className="bg-white border-b border-slate-100 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white rounded-3xl h-96 animate-pulse border border-slate-200"></div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {plans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className={`relative rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all ${
-                    plan.is_popular
-                      ? 'border-2 border-[#0D47A1] bg-blue-50/40 shadow-xl scale-[1.02]'
-                      : 'border border-slate-200 bg-white shadow-sm hover:shadow-md'
-                  }`}
-                >
-                  {plan.is_popular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-[#0D47A1] text-white text-xs font-bold uppercase tracking-wider shadow">
-                      Most Popular in Pune
-                    </div>
-                  )}
+          <h1 className="text-3xl sm:text-4xl font-black text-[#0A2540] tracking-tight">
+            Milk Subscription
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Fresh dairy, automatically delivered to your doorstep.
+          </p>
 
-                  <div>
-                    <h3 className="text-xl font-black text-slate-900">{plan.name}</h3>
-                    <p className="text-xs text-slate-500 mt-2 min-h-[36px] leading-relaxed">
-                      {plan.tagline}
-                    </p>
+          {/* 4 Checkpoint bullets */}
+          <div className="flex items-center gap-6 flex-wrap mt-4 text-xs font-semibold text-slate-600">
+            <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#0B5ED7]" /> Flexible plans</span>
+            <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#0B5ED7]" /> Pause or modify anytime</span>
+            <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#0B5ED7]" /> Save more with subscriptions</span>
+            <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#0B5ED7]" /> Doorstep delivery</span>
+          </div>
 
-                    {/* Pricing Box */}
-                    <div className="my-6 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                      {plan.is_custom ? (
-                        <div>
-                          <span className="text-xs font-bold text-blue-700 uppercase">Pay Per Item</span>
-                          <p className="text-2xl font-black text-slate-900 mt-1">Flexible Rate</p>
-                          <p className="text-[11px] text-slate-400 mt-1">Pick products & custom frequency</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="text-xs text-slate-500 font-medium">Estimated 30-Day Cost</span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-3xl font-black text-slate-900">₹{plan.monthly_price}</span>
-                            <span className="text-xs text-slate-500">/ month</span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-1">
-                            (Billed strictly as delivered at ₹{(plan.daily_price || plan.monthly_price/30).toFixed(0)}/day)
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Items Checklist */}
-                    <div className="space-y-2.5 mb-8">
-                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Included Daily:</p>
-                      {plan.items && plan.items.length > 0 ? (
-                        plan.items.map((item, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-xs sm:text-sm text-slate-700">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span>{parseFloat(item.quantity_per_day)} x {item.product_name} ({item.unit})</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Any combination of milk, curd, paneer & ghee</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Doorstep delivery before 7:00 AM</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Pause or skip days with 1 tap</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleChoosePlan(plan)}
-                    className={`w-full py-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
-                      plan.is_popular
-                        ? 'bg-[#0D47A1] hover:bg-blue-800 text-white shadow-md'
-                        : plan.is_custom
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                        : 'bg-slate-900 hover:bg-slate-800 text-white'
-                    }`}
-                  >
-                    {plan.is_custom ? 'Customize Daily Plan' : `Choose ${plan.name}`}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── How It Works ── */}
-      <div className="py-16 bg-white border-t border-slate-200">
-        <div className="max-w-5xl mx-auto px-4 text-center">
-          <span className="text-xs font-bold text-[#0D47A1] uppercase tracking-wider">Subscription Guarantee</span>
-          <h2 className="text-3xl font-black text-slate-900 mt-1">Zero Lock-In • Pay Per Delivery</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 text-left">
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200">
-              <Clock className="w-6 h-6 text-[#0D47A1] mb-3" />
-              <h4 className="font-bold text-slate-900">Pause Up to 10 PM</h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Traveling or have leftover milk? Tap "Skip" on your customer app by 10 PM and your delivery boy is notified instantly.
-              </p>
-            </div>
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200">
-              <Calendar className="w-6 h-6 text-[#0D47A1] mb-3" />
-              <h4 className="font-bold text-slate-900">Exact Paisa Month-End Bill</h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Bills are generated on the 1st of every month reflecting actual delivery checkmarks. No prepaid locks or hidden charges.
-              </p>
-            </div>
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200">
-              <ShieldCheck className="w-6 h-6 text-[#0D47A1] mb-3" />
-              <h4 className="font-bold text-slate-900">Dedicated Route Partner</h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                The same local delivery partner services your neighborhood daily for seamless morning familiarity and care.
-              </p>
-            </div>
+          {/* Category Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto mt-8 pb-2 scrollbar-none">
+            {SUB_TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  activeTab === tab
+                    ? 'bg-[#0B5ED7] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ── FAQ Preview ── */}
-      <div className="py-16 bg-slate-50 border-t border-slate-200">
-        <div className="max-w-4xl mx-auto px-4">
-          <h3 className="text-2xl font-black text-slate-900 text-center mb-8">
-            Frequently Asked Questions
-          </h3>
-          <div className="space-y-4">
-            {faqs.slice(0, 4).map((faq) => (
-              <div key={faq.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-                <h4 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                  <HelpCircle className="w-4 h-4 text-[#0D47A1] shrink-0" />
-                  {faq.question}
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-600 mt-2 pl-6 leading-relaxed">
-                  {faq.answer}
-                </p>
+      {/* ── 4 Subscription Cards (Mockup exact) ── */}
+      <div className="py-12 bg-slate-50/60">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {plans.map((plan) => (
+              <div
+                key={plan.id}
+                className={`relative bg-white rounded-3xl p-6 border flex flex-col justify-between transition-all ${
+                  plan.is_popular
+                    ? 'border-2 border-[#0B5ED7] shadow-lg'
+                    : 'border-slate-200 shadow-xs hover:shadow-md'
+                }`}
+              >
+                {plan.is_popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#0B5ED7] text-white text-[10px] font-bold uppercase tracking-wider shadow-xs">
+                    Most Popular
+                  </div>
+                )}
+
+                <div className="text-center pt-2">
+                  <h3 className="text-lg font-black text-slate-900">{plan.name}</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{plan.tagline}</p>
+
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#0B5ED7] flex items-center justify-center mx-auto my-5 text-xl font-bold">
+                    {plan.icon}
+                  </div>
+
+                  <p className="text-xs font-bold text-slate-700">{plan.desc}</p>
+
+                  {plan.price ? (
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <span className="text-2xl font-black text-slate-900">₹{plan.price.toLocaleString()}</span>
+                      <span className="text-xs text-slate-400 font-semibold"> / month</span>
+                    </div>
+                  ) : (
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <span className="text-lg font-black text-slate-900">Custom Rate</span>
+                      <p className="text-[10px] text-slate-400">Pay as delivered</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6">
+                  <button
+                    onClick={() => handleChoosePlan(plan)}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-colors shadow-xs ${
+                      plan.is_popular
+                        ? 'bg-[#0B5ED7] hover:bg-blue-700 text-white'
+                        : 'bg-[#0B5ED7] hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {plan.is_custom ? 'Create Plan' : 'Choose Plan'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-          <div className="text-center mt-8">
-            <Link to="/contact?tab=faq" className="text-xs sm:text-sm font-bold text-[#0D47A1] hover:underline">
-              View all FAQs on Contact Page →
-            </Link>
+
+          {/* ── How It Works (Mockup exact) ── */}
+          <div className="mt-16 pt-12 border-t border-slate-200/80">
+            <h3 className="text-xl font-black text-slate-900 text-left mb-8">How It Works</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  1
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">Choose a Plan</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Select your preferred products and daily quantity.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  2
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">Set Your Address</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Tell us your delivery location and preferred morning time.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  3
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">Enjoy Daily Delivery</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Get fresh dairy products at your doorstep every morning.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* ── Bottom Banner: Goodness, Delivered Daily ── */}
+          <div className="mt-14 rounded-2xl bg-[#E8F3FD] border border-blue-200 p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div>
+              <h3 className="text-xl font-black text-slate-900">Goodness, Delivered Daily.</h3>
+              <p className="text-xs text-slate-600 mt-1">
+                Start your subscription today and experience the difference.
+              </p>
+            </div>
+            <button
+              onClick={() => handleChoosePlan(plans[1])}
+              className="px-6 py-3 rounded-xl bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0"
+            >
+              Subscribe Now →
+            </button>
+          </div>
+
         </div>
       </div>
 
-      {/* ── Subscription Confirmation Modal ── */}
+      {/* Confirmation Modal */}
       <Modal
         isOpen={confirmModalOpen}
         onClose={() => setConfirmModalOpen(false)}
@@ -289,48 +272,38 @@ export default function SubscriptionsPage() {
         {selectedPlan && (
           <div className="space-y-4">
             <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-              <p className="text-xs text-blue-800 font-bold uppercase tracking-wider">Plan Summary</p>
-              <h4 className="text-lg font-black text-slate-900 mt-0.5">{selectedPlan.name}</h4>
-              <p className="text-xs text-slate-600 mt-1">{selectedPlan.tagline}</p>
-              
-              <div className="mt-3 pt-3 border-t border-blue-200/60 flex items-center justify-between text-xs">
-                <span className="text-slate-600">Daily Products:</span>
-                <span className="font-bold text-slate-900">
-                  {selectedPlan.items?.map(i => `${parseFloat(i.quantity_per_day)}x ${i.product_name}`).join(', ')}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs mt-1">
-                <span className="text-slate-600">Estimated 30-Day Cost:</span>
-                <span className="font-black text-[#0D47A1] text-sm">₹{selectedPlan.monthly_price}</span>
-              </div>
+              <h4 className="font-black text-slate-900">{selectedPlan.name}</h4>
+              <p className="text-xs text-slate-600 mt-0.5">{selectedPlan.desc}</p>
+              {selectedPlan.price && (
+                <p className="text-sm font-black text-[#0B5ED7] mt-2">
+                  ₹{selectedPlan.price.toLocaleString()} / month
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Subscription Start Date
+                Start Date
               </label>
               <input
                 type="date"
                 min={tomorrowStr}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#0D47A1] focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#0B5ED7] focus:outline-none"
               />
-              <p className="text-[11px] text-slate-400 mt-1">
-                Deliveries can start tomorrow morning or any future date.
-              </p>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Preferred Morning Delivery Window
+                Delivery Window
               </label>
               <select
                 value={deliverySlot}
                 onChange={(e) => setDeliverySlot(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#0D47A1] focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#0B5ED7] focus:outline-none"
               >
-                <option value="5:30 AM - 7:00 AM">Early Morning (5:30 AM - 7:00 AM) [Recommended]</option>
+                <option value="5:30 AM - 7:00 AM">Early Morning (5:30 AM - 7:00 AM)</option>
                 <option value="7:00 AM - 8:30 AM">Morning (7:00 AM - 8:30 AM)</option>
               </select>
             </div>
@@ -347,9 +320,9 @@ export default function SubscriptionsPage() {
                 type="button"
                 disabled={submitting}
                 onClick={handleConfirmSubscription}
-                className="px-5 py-2 rounded-xl bg-[#0D47A1] hover:bg-blue-800 text-white text-xs font-bold shadow-md transition-colors disabled:opacity-50"
+                className="px-5 py-2 rounded-xl bg-[#0B5ED7] hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50"
               >
-                {submitting ? 'Activating...' : 'Confirm & Activate'}
+                {submitting ? 'Activating...' : 'Confirm Subscription'}
               </button>
             </div>
           </div>

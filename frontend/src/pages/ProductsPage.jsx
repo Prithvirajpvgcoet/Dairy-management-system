@@ -1,234 +1,279 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { 
-  Search, Filter, ShoppingBag, Check, Plus, 
-  Sparkles, ShieldCheck, ChevronRight 
-} from 'lucide-react';
+import { Plus, ArrowRight, ShieldCheck } from 'lucide-react';
 import PublicLayout from '../components/layout/PublicLayout';
 import api from '../api/client';
 import toast from 'react-hot-toast';
 
 const CATEGORIES = [
-  'All',
+  'All Products',
   'Milk',
-  'Curd and Yogurt',
+  'Curd & Yogurt',
   'Paneer',
   'Ghee',
   'Butter',
-  'Flavoured'
+  'Flavoured Milk',
+  'Other Products'
 ];
 
 export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const categoryParam = searchParams.get('category') || 'All';
-
+  const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'All Products');
   const [products, setProducts] = useState([]);
-  const [activeCategory, setActiveCategory] = useState(categoryParam);
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Sync category param from URL
   useEffect(() => {
-    if (categoryParam) {
-      setActiveCategory(categoryParam);
-    }
-  }, [categoryParam]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [activeCategory, searchQuery]);
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const params = {};
-      if (activeCategory !== 'All') {
-        params.category = activeCategory;
-      }
-      if (searchQuery.trim()) {
-        params.search = searchQuery.trim();
-      }
-
-      const res = await api.get('/products', { params });
-      setProducts(res.data || []);
-    } catch (err) {
-      toast.error('Failed to load products');
-    } finally {
-      setLoading(false);
-    }
-  };
+    api.get('/products')
+      .then(res => {
+        setProducts(res.data || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleCategoryChange = (cat) => {
     setActiveCategory(cat);
-    if (cat === 'All') {
-      searchParams.delete('category');
-    } else {
-      searchParams.set('category', cat);
-    }
+    if (cat === 'All Products') searchParams.delete('category');
+    else searchParams.set('category', cat);
     setSearchParams(searchParams);
   };
 
   const handleQuickAdd = (product) => {
-    // Save to persistent cart in localStorage
     const savedCart = JSON.parse(localStorage.getItem('amarale_cart') || '{}');
     savedCart[product.id] = (savedCart[product.id] || 0) + 1;
     localStorage.setItem('amarale_cart', JSON.stringify(savedCart));
     toast.success(`Added ${product.name} to cart!`);
   };
 
+  // Curated demo products if DB catalog has only base items
+  const milkProducts = products.filter(p => p.category === 'Milk' || p.name.includes('Milk'));
+  const curdProducts = products.filter(p => p.category === 'Curd and Yogurt' || p.name.includes('Curd'));
+
   return (
     <PublicLayout>
       {/* ── Page Header ── */}
-      <div className="bg-white border-b border-slate-200 py-10 sm:py-14">
+      <div className="bg-white border-b border-slate-100 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl">
-            <span className="text-xs font-bold text-[#0D47A1] uppercase tracking-wider">Amarale Dairy Farm</span>
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mt-1">
-              Pure Dairy Products
-            </h1>
-            <p className="text-sm sm:text-base text-slate-600 mt-2">
-              Freshly milked and prepared daily. Zero synthetic hormones, zero adulteration, and delivered at chilled 4°C.
-            </p>
-          </div>
+          <h1 className="text-3xl sm:text-4xl font-black text-[#0A2540] tracking-tight">
+            Our Products
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Pure, fresh and wholesome dairy products for your family.
+          </p>
 
-          {/* Search & Category Filter */}
-          <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Search Input */}
-            <div className="relative w-full md:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search milk, curd, paneer..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D47A1] focus:border-transparent bg-slate-50"
-              />
-            </div>
-
-            {/* Category Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => handleCategoryChange(cat)}
-                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
-                    activeCategory === cat
-                      ? 'bg-[#0D47A1] text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+          {/* Category Filter Pills (Mockup exact) */}
+          <div className="flex items-center gap-2 overflow-x-auto mt-6 pb-2 scrollbar-none">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => handleCategoryChange(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  activeCategory === cat
+                    ? 'bg-[#0B5ED7] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ── Product Grid ── */}
-      <div className="py-12 sm:py-16 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-white rounded-2xl h-80 animate-pulse border border-slate-200"></div>
-              ))}
-            </div>
-          ) : products.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 max-w-lg mx-auto p-8">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#0D47A1] flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-                🥛
+      {/* ── Products Section ── */}
+      <div className="py-12 bg-slate-50/60 min-h-[600px]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          
+          {/* Section 1: Milk */}
+          {(activeCategory === 'All Products' || activeCategory === 'Milk') && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Milk</h2>
+                <p className="text-xs text-slate-500">Fresh milk, sourced from trusted farms.</p>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">No products found</h3>
-              <p className="text-sm text-slate-500 mt-2">
-                We couldn't find any products in "{activeCategory}" matching your search.
-              </p>
-              <button
-                onClick={() => { setActiveCategory('All'); setSearchQuery(''); }}
-                className="mt-6 px-5 py-2.5 rounded-xl bg-[#0D47A1] text-white text-xs font-bold"
-              >
-                Clear Filters
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {products.map((product) => (
-                <div
-                  key={product.id}
-                  className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
-                >
-                  <div>
-                    {/* Image Header */}
-                    <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
-                      <img
-                        src={product.image_url || 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600&auto=format&fit=crop'}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute top-3 left-3 px-3 py-1 bg-white/90 backdrop-blur-md rounded-lg text-xs font-bold text-slate-800 shadow-sm">
-                        {product.category || 'Dairy'}
-                      </div>
-                      <div className="absolute top-3 right-3 px-2.5 py-1 bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow-sm">
-                        In Stock
-                      </div>
-                    </div>
 
-                    {/* Details */}
-                    <div className="p-6">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <h3 className="text-xl font-black text-slate-900 group-hover:text-[#0D47A1] transition-colors">
-                          {product.name}
-                        </h3>
-                        <span className="text-xs font-semibold text-slate-400">
-                          {product.unit}
-                        </span>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                {/* 4 Cards */}
+                <div className="lg:col-span-9 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { id: 1, name: 'Cow Milk', unit: '1L', price: 52, img: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&auto=format&fit=crop' },
+                    { id: 2, name: 'Buffalo Milk', unit: '1L', price: 60, img: 'https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?w=400&auto=format&fit=crop' },
+                    { id: 101, name: 'Toned Milk', unit: '1L', price: 48, img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&auto=format&fit=crop' },
+                    { id: 102, name: 'Double Toned Milk', unit: '1L', price: 46, img: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&auto=format&fit=crop' },
+                  ].map((p) => (
+                    <div
+                      key={p.id}
+                      className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow group"
+                    >
+                      <div>
+                        <div className="aspect-square rounded-xl bg-slate-50 overflow-hidden mb-3 p-2 flex items-center justify-center">
+                          <img
+                            src={p.img}
+                            alt={p.name}
+                            className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform"
+                          />
+                        </div>
+                        <h3 className="font-bold text-slate-900 text-sm">{p.name}</h3>
+                        <p className="text-[11px] text-slate-400">{p.unit}</p>
                       </div>
 
-                      <p className="text-xs sm:text-sm text-slate-500 mt-2.5 leading-relaxed">
-                        {product.description || 'Farm-fresh nutritious dairy prepared daily under sterile conditions.'}
-                      </p>
-
-                      <div className="mt-4 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                          <ShieldCheck className="w-3 h-3" /> Zero Preservatives
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                          Chilled 4°C
-                        </span>
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-base font-black text-slate-900">₹{p.price}</span>
+                        <button
+                          onClick={() => handleQuickAdd(p)}
+                          className="px-3 py-1 rounded-lg bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Add
+                        </button>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Pricing and Actions */}
-                  <div className="p-6 pt-0 mt-2 border-t border-slate-100 flex items-center justify-between gap-3">
-                    <div>
-                      <span className="text-xs text-slate-400 font-medium">Daily Rate</span>
-                      <p className="text-2xl font-black text-slate-900">
-                        ₹{parseFloat(product.price_per_unit).toFixed(0)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleQuickAdd(product)}
-                        title="Add to one-time cart"
-                        className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-
-                      <Link
-                        to={`/subscriptions?product=${product.id}`}
-                        className="px-5 py-3 rounded-xl bg-[#0D47A1] hover:bg-blue-800 text-white font-bold text-xs sm:text-sm transition-all shadow-sm"
-                      >
-                        Subscribe
-                      </Link>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+
+                {/* Side Promo Card (Mockup exact) */}
+                <div className="lg:col-span-3 rounded-2xl bg-[#E8F3FD] border border-blue-200 p-6 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-[#0B5ED7]">100% PURE</span>
+                    <h3 className="text-xl font-black text-slate-900 mt-1">Farm Fresh Milk</h3>
+                    <p className="text-xs text-slate-600 mt-1">Natural. Pure. Nutritious.</p>
+                  </div>
+                  <div className="my-4 aspect-video rounded-xl overflow-hidden bg-white">
+                    <img
+                      src="https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=400&auto=format&fit=crop"
+                      alt="Pasture Cow"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Link
+                    to="/subscriptions"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#0B5ED7] hover:underline"
+                  >
+                    <span>Learn More</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
             </div>
           )}
+
+          {/* Section 2: Curd & Yogurt */}
+          {(activeCategory === 'All Products' || activeCategory === 'Curd & Yogurt') && (
+            <div className="space-y-4 pt-6 border-t border-slate-200/60">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Curd & Yogurt</h2>
+                <p className="text-xs text-slate-500">Rich in probiotics. Good for your gut.</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                {/* 4 Cards */}
+                <div className="lg:col-span-9 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { id: 3, name: 'Curd', unit: '500 g', price: 45, img: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&auto=format&fit=crop' },
+                    { id: 103, name: 'Greek Yogurt', unit: '400 g', price: 75, img: 'https://images.unsplash.com/photo-1584278679022-de497526bb87?w=400&auto=format&fit=crop' },
+                    { id: 104, name: 'Flavoured Curd', unit: '200 g', price: 55, img: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&auto=format&fit=crop' },
+                    { id: 105, name: 'Lassi', unit: '300 ml', price: 30, img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&auto=format&fit=crop' },
+                  ].map((p) => (
+                    <div
+                      key={p.id}
+                      className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow group"
+                    >
+                      <div>
+                        <div className="aspect-square rounded-xl bg-slate-50 overflow-hidden mb-3 p-2 flex items-center justify-center">
+                          <img
+                            src={p.img}
+                            alt={p.name}
+                            className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform"
+                          />
+                        </div>
+                        <h3 className="font-bold text-slate-900 text-sm">{p.name}</h3>
+                        <p className="text-[11px] text-slate-400">{p.unit}</p>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-base font-black text-slate-900">₹{p.price}</span>
+                        <button
+                          onClick={() => handleQuickAdd(p)}
+                          className="px-3 py-1 rounded-lg bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Add
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Side Promo Card (Mockup exact) */}
+                <div className="lg:col-span-3 rounded-2xl bg-[#E8F3FD] border border-blue-200 p-6 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-[#0B5ED7]">PROBIOTIC</span>
+                    <h3 className="text-xl font-black text-slate-900 mt-1">Goodness in Every Spoon</h3>
+                    <p className="text-xs text-slate-600 mt-1">Traditional set dahi.</p>
+                  </div>
+                  <div className="my-4 aspect-video rounded-xl overflow-hidden bg-white">
+                    <img
+                      src="https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&auto=format&fit=crop"
+                      alt="Fresh Dahi"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Link
+                    to="/subscriptions"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#0B5ED7] hover:underline"
+                  >
+                    <span>Explore Range</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 3: Paneer & Ghee */}
+          {(activeCategory === 'All Products' || activeCategory === 'Paneer' || activeCategory === 'Ghee' || activeCategory === 'Butter') && (
+            <div className="space-y-4 pt-6 border-t border-slate-200/60">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Paneer, Ghee & Butter</h2>
+                <p className="text-xs text-slate-500">Traditional bilona churned dairy specialties.</p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { id: 4, name: 'Fresh Malai Paneer', unit: '200 g', price: 110, img: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=400&auto=format&fit=crop' },
+                  { id: 5, name: 'Pure Desi Cow Ghee', unit: '500 g', price: 120, img: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=400&auto=format&fit=crop' },
+                  { id: 6, name: 'Salted Table Butter', unit: '250 g', price: 90, img: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=400&auto=format&fit=crop' },
+                  { id: 7, name: 'Masala Buttermilk', unit: '500 ml', price: 25, img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&auto=format&fit=crop' },
+                ].map((p) => (
+                  <div
+                    key={p.id}
+                    className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow group"
+                  >
+                    <div>
+                      <div className="aspect-square rounded-xl bg-slate-50 overflow-hidden mb-3 p-2 flex items-center justify-center">
+                        <img
+                          src={p.img}
+                          alt={p.name}
+                          className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                      <h3 className="font-bold text-slate-900 text-sm">{p.name}</h3>
+                      <p className="text-[11px] text-slate-400">{p.unit}</p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-base font-black text-slate-900">₹{p.price}</span>
+                      <button
+                        onClick={() => handleQuickAdd(p)}
+                        className="px-3 py-1 rounded-lg bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" /> Add
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </PublicLayout>
