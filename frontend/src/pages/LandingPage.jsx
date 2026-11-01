@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, User, ShoppingCart, ShieldCheck, Leaf, Clock,
-  Truck, Smartphone, CheckCircle2, Plus, ArrowRight, Menu, X, Play
+  Truck, Smartphone, CheckCircle2, Plus, ArrowRight, Menu, X, Check
 } from 'lucide-react';
 import api from '../api/client';
 
@@ -40,16 +40,16 @@ const PRODUCT_IMAGES = {
 const DEFAULT_PRODUCTS = [
   { id: 1, name: 'Cow Milk', unit: '1 Litre', price_per_unit: 52, icon: '🥛' },
   { id: 2, name: 'Buffalo Milk', unit: '1 Litre', price_per_unit: 60, icon: '🥛' },
-  { id: 3, name: 'Curd', unit: '500g', price_per_unit: 45, icon: '🥣' },
-  { id: 4, name: 'Paneer', unit: '200g', price_per_unit: 110, icon: '🧀' },
-  { id: 5, name: 'Ghee', unit: '250g', price_per_unit: 120, icon: '🍯' },
+  { id: 3, name: 'Curd', unit: '500 g', price_per_unit: 45, icon: '🥣' },
+  { id: 4, name: 'Paneer', unit: '200 g', price_per_unit: 110, icon: '🧀' },
+  { id: 5, name: 'Ghee', unit: '200 g', price_per_unit: 120, icon: '🍯' },
 ];
 
 const PLANS = [
-  { id: 1, name: 'Daily', desc: 'Fresh milk every day', price: '₹52', per: '/day', popular: false },
-  { id: 2, name: 'Alternate Day', desc: 'Fresh milk on alternate days', price: '₹36', per: '/day', popular: false },
-  { id: 3, name: 'Weekly', desc: '7 days subscription', price: '₹350', per: '/week', popular: true },
-  { id: 4, name: 'Monthly', desc: '30 days subscription', price: '₹1,350', per: '/month', popular: false },
+  { id: 1, name: 'Daily', desc: 'Every day delivery', price: '₹52', per: '/day', popular: false },
+  { id: 2, name: 'Alternate Day', desc: 'On alternate days', price: '₹36', per: '/delivery', popular: false },
+  { id: 3, name: 'Weekly', desc: '7 days delivery', price: '₹350', per: '/week', popular: true },
+  { id: 4, name: 'Monthly', desc: '30 days delivery', price: '₹1,350', per: '/month', popular: false },
 ];
 
 const LandingPage = () => {
@@ -74,7 +74,7 @@ const LandingPage = () => {
 
   useEffect(() => {
     api.get('/products')
-      .then(res => setProducts(res.data || DEFAULT_PRODUCTS))
+      .then(res => setProducts(res.data && res.data.length > 0 ? res.data : DEFAULT_PRODUCTS))
       .catch(() => setProducts(DEFAULT_PRODUCTS));
   }, []);
 
@@ -88,13 +88,13 @@ const LandingPage = () => {
     <div className="min-h-screen bg-white font-['Poppins'] selection:bg-[#0D47A1] selection:text-white">
       
       {/* ─── NAVBAR ─── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-md shadow-md py-3' : 'bg-white py-5'}`}>
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-md py-3' : 'bg-white py-5'}`}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-shadow border border-gray-100">
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm group-hover:shadow-md transition-shadow border border-gray-100">
               <img src="/images/logo.jpg" alt="Amarale Logo" className="w-full h-full object-cover" />
             </div>
-            <div className="text-2xl font-extrabold text-[#0D47A1] tracking-tight">
+            <div className="text-2xl font-black text-[#0D47A1] tracking-tight">
               अमराळे
             </div>
           </Link>
@@ -102,9 +102,10 @@ const LandingPage = () => {
           {/* Desktop Nav */}
           <div className="hidden md:flex space-x-8 text-sm font-semibold text-gray-600">
             <Link to="/" className="text-[#0D47A1]">Home</Link>
-            <a href="#products" className="hover:text-[#0D47A1] transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-[#0D47A1] after:transition-all after:duration-300">Products</a>
-            <a href="#subscription" className="hover:text-[#0D47A1] transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-[#0D47A1] after:transition-all after:duration-300">Subscription</a>
-            <a href="#about" className="hover:text-[#0D47A1] transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-[#0D47A1] after:transition-all after:duration-300">About Us</a>
+            <a href="#products" className="hover:text-[#0D47A1] transition-colors">Products</a>
+            <a href="#subscription" className="hover:text-[#0D47A1] transition-colors">Subscription</a>
+            <a href="#about" className="hover:text-[#0D47A1] transition-colors">About Us</a>
+            <Link to="/contact" className="hover:text-[#0D47A1] transition-colors">Contact Us</Link>
           </div>
 
           <div className="flex items-center space-x-4">
@@ -117,8 +118,7 @@ const LandingPage = () => {
                 </span>
               )}
             </Link>
-            <Link to="/login" className="text-gray-500 hover:text-[#0D47A1] hidden sm:block transition-colors"><User className="w-5 h-5" /></Link>
-            <Link to="/login" className="bg-[#0D47A1] text-white px-6 py-2.5 rounded-full font-bold text-sm hover:bg-blue-800 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 hidden sm:block">
+            <Link to="/login" className="bg-[#0D47A1] text-white px-6 py-2.5 rounded-full font-bold text-sm hover:bg-blue-800 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95">
               Login
             </Link>
             <button className="md:hidden text-[#0D47A1]" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -134,145 +134,104 @@ const LandingPage = () => {
           <a href="#products" onClick={() => setMobileMenuOpen(false)} className="border-b border-gray-100 pb-4">Products</a>
           <a href="#subscription" onClick={() => setMobileMenuOpen(false)} className="border-b border-gray-100 pb-4">Subscription</a>
           <a href="#about" onClick={() => setMobileMenuOpen(false)} className="border-b border-gray-100 pb-4">About Us</a>
+          <Link to="/contact" onClick={() => setMobileMenuOpen(false)} className="border-b border-gray-100 pb-4">Contact Us</Link>
           <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="bg-[#0D47A1] text-white py-3 rounded-xl text-center shadow-md">Login to your account</Link>
         </div>
       </div>
 
       {/* ─── HERO ─── */}
-      <section ref={heroRef} className="relative pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden bg-gradient-to-br from-blue-50/50 via-white to-blue-50/30">
+      <section ref={heroRef} className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden bg-gradient-to-br from-blue-50/60 via-white to-blue-50/40">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center relative z-10">
           
           {/* Left Text */}
           <div className={`w-full md:w-1/2 z-20 mb-12 md:mb-0 transition-all duration-1000 ${heroVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-12'}`}>
-            <div className="inline-flex items-center gap-2 bg-blue-100/80 backdrop-blur-sm text-[#0D47A1] text-xs font-bold px-4 py-1.5 rounded-full mb-6 border border-blue-200">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0D47A1]"></span>
-              </span>
-              Fresh from Farm to Home
-            </div>
-            <h1 className="text-5xl md:text-7xl font-extrabold text-gray-900 leading-[1.1] mb-6 tracking-tight">
-              Premium Milk,<br />
-              <span className="text-[#0D47A1] relative inline-block mt-2">
-                Delivered Daily
-                <svg className="absolute w-full h-3 -bottom-1 left-0 text-blue-200 opacity-70" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="transparent"/></svg>
-              </span>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-gray-900 leading-[1.15] mb-4 tracking-tight">
+              Farm Fresh Milk<br />
+              <span className="text-[#0D47A1]">Delivered Daily</span>
             </h1>
-            <p className="text-gray-500 text-lg mb-8 max-w-md font-medium leading-relaxed">
-              Experience the purity of traditional dairy. No preservatives, completely natural, delivered right to your doorstep before 7 AM.
+            <p className="text-gray-700 font-bold text-lg mb-2">
+              Pure. Natural. Healthy.
+            </p>
+            <p className="text-gray-500 text-base mb-6 max-w-md font-medium leading-relaxed">
+              From our farm to your home, before 7 AM every morning.
             </p>
 
-            <div className="flex flex-wrap gap-4 items-center">
-              <Link to="/login" className="relative group overflow-hidden bg-[#0D47A1] text-white px-8 py-3.5 rounded-full font-bold shadow-lg shadow-blue-900/30 transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-2">
-                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></span>
-                Start Subscription <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <a href="#about" className="flex items-center gap-2 text-gray-700 font-bold hover:text-[#0D47A1] transition-colors">
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center group hover:bg-blue-100 transition-colors">
-                  <Play className="w-4 h-4 ml-1 text-gray-600 group-hover:text-[#0D47A1]" />
-                </div>
-                How it works
-              </a>
+            {/* Badges */}
+            <div className="flex flex-wrap gap-4 mb-8 text-xs font-bold text-gray-700">
+              <span className="inline-flex items-center gap-1.5 bg-blue-50 text-[#0D47A1] px-3.5 py-1.5 rounded-full border border-blue-100">
+                <Leaf className="w-4 h-4 text-emerald-600" /> 100% Pure & Natural
+              </span>
+              <span className="inline-flex items-center gap-1.5 bg-blue-50 text-[#0D47A1] px-3.5 py-1.5 rounded-full border border-blue-100">
+                <ShieldCheck className="w-4 h-4 text-[#0D47A1]" /> No Preservatives
+              </span>
+              <span className="inline-flex items-center gap-1.5 bg-blue-50 text-[#0D47A1] px-3.5 py-1.5 rounded-full border border-blue-100">
+                <Clock className="w-4 h-4 text-blue-600" /> Delivered Before 7 AM
+              </span>
             </div>
 
-            <div className="mt-12 flex items-center gap-8 border-t border-gray-100 pt-8">
-              <div className="flex -space-x-3">
-                {[1,2,3,4].map((i) => (
-                  <div key={i} className={`w-10 h-10 rounded-full border-2 border-white bg-blue-${i*100} flex items-center justify-center overflow-hidden shadow-sm`}>
-                    <User className="w-5 h-5 text-gray-400" />
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="flex items-center gap-1 mb-1">
-                  {[1,2,3,4,5].map((i) => <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>)}
-                </div>
-                <p className="text-sm font-bold text-gray-800">Trusted by 10L+ Families</p>
-              </div>
+            <div className="flex flex-wrap gap-4 items-center">
+              <Link to="/login" className="bg-[#0D47A1] text-white px-8 py-3.5 rounded-full font-bold shadow-lg shadow-blue-900/25 transition-all hover:bg-blue-800 hover:-translate-y-0.5 active:scale-95 flex items-center gap-2">
+                Start Subscription <ArrowRight className="w-4 h-4" />
+              </Link>
+              <a href="#products" className="px-8 py-3.5 rounded-full font-bold border-2 border-gray-300 text-gray-700 hover:border-[#0D47A1] hover:text-[#0D47A1] transition-all">
+                Shop Now
+              </a>
             </div>
           </div>
 
           {/* Right Image */}
           <div className={`w-full md:w-1/2 relative transition-all duration-1000 delay-300 ${heroVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-blue-200/30 rounded-full blur-3xl -z-10"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-blue-200/40 rounded-full blur-3xl -z-10"></div>
             
             <img
               src="/images/product2.png"
-              alt="Amarale Premium Milk Splash"
-              className="w-full h-auto max-w-[600px] mx-auto drop-shadow-2xl animate-[float_6s_ease-in-out_infinite]"
+              alt="Farm Fresh Amarale Milk"
+              className="w-full h-auto max-w-[540px] mx-auto drop-shadow-2xl animate-[float_6s_ease-in-out_infinite]"
+              onError={(e) => { e.target.src = '/images/product1.png'; }}
             />
-            
-            {/* Floating Badges */}
-            <div className="absolute top-10 right-0 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl p-4 border border-white/50 animate-[float_5s_ease-in-out_infinite_1s]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <Leaf className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 font-bold uppercase">Quality</p>
-                  <p className="text-sm font-extrabold text-gray-800">100% Pure</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="absolute bottom-20 left-0 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl p-4 border border-white/50 animate-[float_7s_ease-in-out_infinite_2s]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#0D47A1]/10 rounded-full flex items-center justify-center">
-                  <Truck className="w-5 h-5 text-[#0D47A1]" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 font-bold uppercase">Delivery</p>
-                  <p className="text-sm font-extrabold text-gray-800">Before 7 AM</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* ─── PRODUCT GRID ─── */}
+      {/* ─── SHOP OUR PRODUCTS ─── */}
       <section id="products" ref={productsRef} className={`py-20 transition-all duration-1000 ${productsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-end justify-between mb-12 gap-4">
+          <div className="flex items-center justify-between mb-10">
             <div>
-              <span className="text-[#0D47A1] font-bold text-sm tracking-wider uppercase mb-2 block">Our Products</span>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight">Farm Fresh Goodness</h2>
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight">Shop Our Products</h2>
             </div>
-            <Link to="/login" className="group flex items-center text-[#0D47A1] font-bold text-sm hover:bg-blue-50 px-4 py-2 rounded-full transition-colors">
-              Explore All <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+            <Link to="/login" className="text-[#0D47A1] font-bold text-sm hover:underline flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
-            {(products.length > 0 ? products : DEFAULT_PRODUCTS).map((product, idx) => (
+            {(products.length > 0 ? products : DEFAULT_PRODUCTS).slice(0, 5).map((product) => (
               <div
                 key={product.id}
-                className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl hover:-translate-y-2 transition-all duration-300"
-                style={{ transitionDelay: `${idx * 50}ms` }}
+                className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
               >
-                <div className="relative bg-gradient-to-b from-blue-50 to-white pt-8 pb-4 px-4 flex items-center justify-center h-48">
+                <div className="bg-gradient-to-b from-blue-50/60 to-white rounded-xl p-4 flex items-center justify-center h-44 mb-3">
                   <img
                     src={PRODUCT_IMAGES[product.name] || PRODUCT_IMAGES.default}
                     alt={product.name}
-                    className="w-32 h-auto object-contain group-hover:scale-110 transition-transform duration-500 drop-shadow-md"
+                    className="max-h-36 w-auto object-contain drop-shadow"
                     onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                   />
-                  <div className="hidden items-center justify-center text-6xl drop-shadow-md">{product.icon || '🥛'}</div>
+                  <div className="hidden items-center justify-center text-5xl">{product.icon || '🥛'}</div>
                 </div>
 
-                <div className="p-5">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-extrabold text-gray-900 text-lg">{product.name}</h3>
-                  </div>
-                  <p className="text-sm text-gray-500 font-medium mb-4">{product.unit || '1 unit'}</p>
+                <div>
+                  <h3 className="font-black text-gray-900 text-base">{product.name}</h3>
+                  <p className="text-xs text-gray-500 font-medium mb-3">{product.unit || '1 Litre'}</p>
                   
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-extrabold text-[#0D47A1]">₹{product.price_per_unit || product.price}</span>
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <span className="text-lg font-black text-gray-900">₹{product.price_per_unit || product.price || 52}</span>
                     <button
                       onClick={() => handleAddToCart(product.id)}
-                      className="w-10 h-10 rounded-full bg-blue-50 text-[#0D47A1] hover:bg-[#0D47A1] hover:text-white flex items-center justify-center transition-colors active:scale-95"
+                      className="px-3 py-1.5 rounded-full bg-[#0D47A1] text-white hover:bg-blue-800 text-xs font-bold flex items-center gap-1 transition-colors active:scale-95"
                     >
-                      {cart[product.id] ? <CheckCircle2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                      {cart[product.id] ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} Add
                     </button>
                   </div>
                 </div>
@@ -282,59 +241,46 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ─── SUBSCRIPTION PLANS ─── */}
-      <section id="subscription" ref={plansRef} className={`py-24 bg-[#0D47A1] relative overflow-hidden transition-all duration-1000 ${plansVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
-
+      {/* ─── CHOOSE YOUR SUBSCRIPTION ─── */}
+      <section id="subscription" ref={plansRef} className={`py-20 bg-slate-50 relative overflow-hidden transition-all duration-1000 ${plansVisible ? 'opacity-100' : 'opacity-0'}`}>
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">Flexible Subscriptions</h2>
-            <p className="text-blue-100 font-medium text-lg max-w-2xl mx-auto">Pause, resume, or modify your milk delivery anytime. Save more with our monthly plans.</p>
+          <div className="mb-12">
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Choose Your Subscription</h2>
+            <p className="text-gray-500 font-medium text-sm mt-1">Save more with our flexible plans</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {PLANS.map((plan, idx) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {PLANS.map((plan) => (
               <div
                 key={plan.id}
-                className={`relative bg-white rounded-3xl p-8 transition-all duration-300 hover:-translate-y-2 ${
-                  plan.popular ? 'ring-4 ring-blue-300 shadow-2xl scale-105 z-10' : 'shadow-xl'
+                className={`relative bg-white rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 border ${
+                  plan.popular ? 'border-[#0D47A1] shadow-xl ring-2 ring-blue-200' : 'border-gray-200 shadow-sm'
                 }`}
-                style={{ transitionDelay: `${idx * 100}ms` }}
               >
                 {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-[#0D47A1] text-white text-xs font-bold uppercase tracking-widest px-6 py-1.5 rounded-full shadow-lg">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0D47A1] text-white text-[11px] font-bold uppercase tracking-wider px-3.5 py-0.5 rounded-full shadow">
                     Most Popular
                   </div>
                 )}
 
-                <h3 className="text-2xl font-extrabold text-gray-900 mb-2">{plan.name}</h3>
-                <p className="text-sm text-gray-500 font-medium mb-6 h-10">{plan.desc}</p>
+                <h3 className="text-xl font-black text-gray-900 mb-1">{plan.name}</h3>
+                <p className="text-xs text-gray-500 font-medium mb-6 h-8">{plan.desc}</p>
 
-                <div className="mb-8 flex items-baseline">
-                  <span className="text-4xl font-extrabold text-gray-900">{plan.price}</span>
-                  <span className="text-gray-500 font-medium ml-1">{plan.per}</span>
+                <div className="mb-6 flex items-baseline">
+                  <span className="text-3xl font-black text-gray-900">{plan.price}</span>
+                  <span className="text-xs text-gray-500 font-semibold ml-1">{plan.per}</span>
                 </div>
 
                 <Link
                   to="/login"
-                  className={`block w-full text-center font-bold py-3.5 rounded-xl transition-all ${
+                  className={`block w-full text-center font-bold text-sm py-2.5 rounded-xl transition-all ${
                     plan.popular
-                      ? 'bg-[#0D47A1] text-white hover:bg-blue-800 shadow-lg shadow-blue-900/20'
+                      ? 'bg-[#0D47A1] text-white hover:bg-blue-800 shadow'
                       : 'bg-blue-50 text-[#0D47A1] hover:bg-blue-100'
                   }`}
                 >
                   Choose Plan
                 </Link>
-                
-                <ul className="mt-6 space-y-3">
-                  {['Free Doorstep Delivery', 'No hidden charges', 'Pause anytime'].map((feature, i) => (
-                     <li key={i} className="flex items-center text-sm font-medium text-gray-600">
-                        <CheckCircle2 className="w-4 h-4 text-green-500 mr-2 shrink-0" />
-                        {feature}
-                     </li>
-                  ))}
-                </ul>
               </div>
             ))}
           </div>
@@ -342,62 +288,92 @@ const LandingPage = () => {
       </section>
 
       {/* ─── HOW IT WORKS ─── */}
-      <section id="about" ref={stepsRef} className={`py-24 bg-slate-50 transition-all duration-1000 ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
+      <section id="about" ref={stepsRef} className={`py-20 bg-white transition-all duration-1000 ${stepsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <span className="text-[#0D47A1] font-bold text-sm tracking-wider uppercase mb-2 block">How It Works</span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight">4 Steps to Freshness</h2>
+          <div className="mb-12">
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">How It Works</h2>
           </div>
 
-          <div className="relative grid grid-cols-1 md:grid-cols-4 gap-12">
-            {/* Connecting line */}
-            <div className="hidden md:block absolute top-12 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-blue-200 via-blue-300 to-blue-200 z-0" />
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { icon: Smartphone, label: 'Subscribe', desc: 'Choose your products and set a schedule.', step: 1 },
-              { icon: Leaf, label: 'Farm Fresh', desc: 'Sourced directly from our pure farms.', step: 2 },
-              { icon: Truck, label: 'Dispatch', desc: 'Our delivery partners start early morning.', step: 3 },
-              { icon: Clock, label: 'Delivered', desc: 'Fresh milk at your door before 7 AM.', step: 4 },
-            ].map(({ icon: Icon, label, desc, step }, idx) => (
-              <div key={step} className="relative z-10 flex flex-col items-center text-center group" style={{ transitionDelay: `${idx * 150}ms` }}>
-                <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-md shadow-blue-900/5 border border-gray-100 group-hover:-translate-y-2 group-hover:shadow-xl transition-all duration-300 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-blue-50 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                  <Icon className="w-10 h-10 text-[#0D47A1] relative z-10" />
-                  <div className="absolute -top-3 -right-3 w-8 h-8 bg-[#0D47A1] text-white text-sm font-extrabold rounded-full flex items-center justify-center shadow-md">
-                    {step}
-                  </div>
+              { num: 1, label: 'Place Your Order', desc: 'Choose products and select your plan' },
+              { num: 2, label: 'We Collect Fresh', desc: 'Milk collected fresh from our farm' },
+              { num: 3, label: 'Out for Delivery', desc: 'Our delivery partner is on the way' },
+              { num: 4, label: 'Delivered Before 7 AM', desc: 'Right to your doorstep before 7 AM' },
+            ].map((step) => (
+              <div key={step.num} className="flex flex-col items-start">
+                <div className="w-10 h-10 rounded-full bg-[#0D47A1] text-white font-black text-sm flex items-center justify-center mb-4 shadow">
+                  {step.num}
                 </div>
-                <h4 className="font-extrabold text-gray-900 text-lg mb-2">{label}</h4>
-                <p className="text-sm text-gray-500 font-medium">{desc}</p>
+                <h4 className="font-black text-gray-900 text-base mb-1">{step.label}</h4>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">{step.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* ─── BOTTOM TRUST BAR ─── */}
+      <section className="bg-blue-50/50 py-10 border-y border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#0D47A1]">
+              <Leaf className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <h5 className="font-black text-gray-900 text-sm">Pure & Natural</h5>
+              <p className="text-xs text-gray-500">100% farm fresh</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#0D47A1]">
+              <ShieldCheck className="w-6 h-6 text-[#0D47A1]" />
+            </div>
+            <div>
+              <h5 className="font-black text-gray-900 text-sm">No Preservatives</h5>
+              <p className="text-xs text-gray-500">Only natural products</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#0D47A1]">
+              <Clock className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h5 className="font-black text-gray-900 text-sm">On Time Delivery</h5>
+              <p className="text-xs text-gray-500">Before 7 AM</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#0D47A1]">
+              <User className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h5 className="font-black text-gray-900 text-sm">Trusted by Families</h5>
+              <p className="text-xs text-gray-500">1L+ happy customers</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ─── FOOTER ─── */}
-      <footer className="bg-gray-900 pt-16 pb-8 border-t border-gray-800">
+      <footer className="bg-gray-900 pt-16 pb-8 border-t border-gray-800 text-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12 border-b border-gray-800 pb-12">
             <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg overflow-hidden bg-white">
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-white">
                   <img src="/images/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
                 </div>
-                <span className="text-3xl font-extrabold text-white">अमराळे</span>
+                <span className="text-3xl font-black text-white">अमराळे</span>
               </div>
-              <p className="text-gray-400 font-medium max-w-sm mb-6 leading-relaxed">
+              <p className="text-gray-400 font-medium max-w-sm mb-6 leading-relaxed text-sm">
                 Bringing the purity of traditional dairy farming straight to your home. Pure, natural, and fresh every morning.
               </p>
-              <div className="flex gap-4">
-                {/* Social icons placeholders */}
-                {[1,2,3].map(i => <div key={i} className="w-10 h-10 rounded-full bg-gray-800 hover:bg-[#0D47A1] transition-colors flex items-center justify-center text-white cursor-pointer"><User className="w-4 h-4"/></div>)}
-              </div>
             </div>
             
             <div>
-              <h4 className="text-white font-bold mb-6 uppercase tracking-wider text-sm">Quick Links</h4>
-              <ul className="space-y-3 font-medium text-gray-400">
+              <h4 className="text-white font-bold mb-6 uppercase tracking-wider text-xs">Quick Links</h4>
+              <ul className="space-y-3 font-medium text-gray-400 text-sm">
                 <li><a href="#products" className="hover:text-white transition-colors">Our Products</a></li>
                 <li><a href="#subscription" className="hover:text-white transition-colors">Subscriptions</a></li>
                 <li><a href="#about" className="hover:text-white transition-colors">How it works</a></li>
@@ -406,8 +382,8 @@ const LandingPage = () => {
             </div>
             
             <div>
-              <h4 className="text-white font-bold mb-6 uppercase tracking-wider text-sm">Contact Us</h4>
-              <ul className="space-y-3 font-medium text-gray-400">
+              <h4 className="text-white font-bold mb-6 uppercase tracking-wider text-xs">Contact Us</h4>
+              <ul className="space-y-3 font-medium text-gray-400 text-sm">
                 <li>support@amarale.com</li>
                 <li>+91 98765 43210</li>
                 <li>Pune, Maharashtra</li>
@@ -415,7 +391,7 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <div className="flex flex-col md:flex-row items-center justify-between text-gray-500 text-sm font-medium">
+          <div className="flex flex-col md:flex-row items-center justify-between text-gray-500 text-xs font-medium">
             <p>© 2026 Amarale Dairy Farms. All rights reserved.</p>
             <div className="flex gap-6 mt-4 md:mt-0">
               <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
@@ -425,14 +401,11 @@ const LandingPage = () => {
         </div>
       </footer>
 
-      {/* Global styles for custom animations */}
+      {/* Animation keyframes */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes float {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-15px); }
-        }
-        @keyframes shimmer {
-          100% { transform: translateX(100%); }
+          50% { transform: translateY(-12px); }
         }
       `}} />
     </div>

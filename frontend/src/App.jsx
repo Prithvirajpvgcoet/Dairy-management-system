@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Public Pages
+import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
 import ProductsPage from './pages/ProductsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
@@ -51,7 +52,8 @@ function App() {
         <Toaster position="top-right" />
         <Routes>
           {/* Public 5-Page Brand Website */}
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/home" element={<HomePage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/our-story" element={<OurStoryPage />} />

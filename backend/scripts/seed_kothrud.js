@@ -1,5 +1,6 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
+const { generateForDate } = require('../src/services/deliveryGenerator');
 require('dotenv').config();
 
 async function seedKothrudCustomers() {
@@ -8,18 +9,21 @@ async function seedKothrudCustomers() {
         host: process.env.DB_HOST || 'localhost', 
         user: process.env.DB_USER || 'root', 
         password: process.env.DB_PASSWORD || '', 
-        database: process.env.DB_NAME || 'dairy_db' 
+        database: process.env.DB_NAME || 'dairy_db',
+        timezone: '+05:30',
+        dateStrings: true
     });
 
     try {
         const passwordHash = await bcrypt.hash('Test@1234', 10);
         
-        // 1. Get/Create Product
-        const [products] = await pool.query('SELECT id FROM products LIMIT 1');
+        // 1. Get Cow Milk Product
+        const [products] = await pool.query('SELECT id, price_per_unit FROM products WHERE name LIKE "%Cow Milk%" OR name LIKE "%Milk%" LIMIT 1');
         const productId = products.length > 0 ? products[0].id : 1;
+        const productPrice = products.length > 0 ? products[0].price_per_unit : 52;
 
-        // 2. Create a specific Delivery Boy for Kothrud
-        const email = 'kothrud@dairy.com';
+        // 2. Find or create Rahul Sharma (delivery boy)
+        const email = 'rahul@dairy.com';
         let [users] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
         let userId;
         
@@ -28,7 +32,7 @@ async function seedKothrudCustomers() {
         } else {
             const [userRes] = await pool.query(
                 'INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, "DELIVERY_BOY", ?)',
-                ['Kothrud Delivery Partner', email, passwordHash, '9991112222']
+                ['Rahul Sharma', email, passwordHash, '9876543210']
             );
             userId = userRes.insertId;
         }
@@ -42,17 +46,17 @@ async function seedKothrudCustomers() {
             dbId = dbRes.insertId;
         }
 
-        console.log('Delivery Boy Created. ID:', dbId);
+        console.log(`Assigning route to Delivery Boy ID: ${dbId} (Rahul Sharma, ${email})`);
 
-        // 3. Clear old customers assigned to this DB (if script is re-run)
+        // 3. Clear old customers assigned to this DB
         await pool.query('DELETE FROM delivery_routes WHERE delivery_boy_id = ?', [dbId]);
 
-        // 4. Array of roughly real coordinates in Kothrud, Pune
+        // 4. Array of real coordinates in Kothrud, Pune
         const kothrudLocations = [
-            { name: "Rahul Deshmukh", address: "Karishma Society, Kothrud, Pune", lat: 18.4988, lng: 73.8188 },
-            { name: "Priya Kulkarni", address: "City Pride, Kothrud, Pune", lat: 18.5020, lng: 73.8155 },
-            { name: "Amit Joshi", address: "Dahanukar Colony, Kothrud, Pune", lat: 18.4942, lng: 73.8123 },
-            { name: "Sneha Patil", address: "Mayur Colony, Kothrud, Pune", lat: 18.5074, lng: 73.8101 },
+            { name: "Anil Deshmukh", address: "Karishma Society, Kothrud, Pune", lat: 18.4988, lng: 73.8188 },
+            { name: "Sneha Patil", address: "City Pride, Kothrud, Pune", lat: 18.5020, lng: 73.8155 },
+            { name: "Vijay Jadhav", address: "Dahanukar Colony, Kothrud, Pune", lat: 18.4942, lng: 73.8123 },
+            { name: "Amit Kulkarni", address: "Mayur Colony, Kothrud, Pune", lat: 18.5074, lng: 73.8101 },
             { name: "Vikram Gokhale", address: "Rambaug Colony, Kothrud, Pune", lat: 18.5098, lng: 73.8192 },
             { name: "Neha Bhide", address: "Paud Road, Kothrud, Pune", lat: 18.5055, lng: 73.8055 },
             { name: "Sanjay Nene", address: "Bhusari Colony, Kothrud, Pune", lat: 18.5041, lng: 73.7990 },
@@ -71,18 +75,19 @@ async function seedKothrudCustomers() {
             { name: "Swati Phadke", address: "Chaitanya Nagar, Kothrud, Pune", lat: 18.4980, lng: 73.8140 },
         ];
 
-        console.log('Creating 20 Kothrud Customers...');
+        console.log('Seeding 20 Kothrud Customers...');
         
         for (let i = 0; i < kothrudLocations.length; i++) {
             const loc = kothrudLocations[i];
             const custEmail = `kothrud_cust_${i+1}@dairy.com`;
             const phone = `999333${i.toString().padStart(4, '0')}`;
 
-            // Create User
+            // Create or update User
             let [cUsers] = await pool.query('SELECT id FROM users WHERE email = ?', [custEmail]);
             let cUserId;
             if (cUsers.length > 0) {
                 cUserId = cUsers[0].id;
+                await pool.query('UPDATE users SET name = ?, phone = ? WHERE id = ?', [loc.name, phone, cUserId]);
             } else {
                 const [userRes] = await pool.query(
                     'INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, "CUSTOMER", ?)',
@@ -91,12 +96,11 @@ async function seedKothrudCustomers() {
                 cUserId = userRes.insertId;
             }
 
-            // Create Customer
+            // Create or update Customer
             let [custs] = await pool.query('SELECT id FROM customers WHERE user_id = ?', [cUserId]);
             let customerId;
             if (custs.length > 0) {
                 customerId = custs[0].id;
-                // Update coordinates just in case
                 await pool.query('UPDATE customers SET address = ?, gps_lat = ?, gps_lng = ? WHERE id = ?', 
                                 [loc.address, loc.lat, loc.lng, customerId]);
             } else {
@@ -108,28 +112,30 @@ async function seedKothrudCustomers() {
             }
 
             // Ensure Active Subscription
-            let [subs] = await pool.query('SELECT id FROM subscriptions WHERE customer_id = ?', [customerId]);
+            let [subs] = await pool.query('SELECT id FROM subscriptions WHERE customer_id = ? AND product_id = ?', [customerId, productId]);
             if (subs.length === 0) {
                 await pool.query(
-                    'INSERT INTO subscriptions (customer_id, product_id, quantity_per_day, price_per_unit, start_date, status) VALUES (?, ?, ?, ?, CURDATE(), "ACTIVE")',
-                    [customerId, productId, 1.5, 70]
+                    'INSERT INTO subscriptions (customer_id, product_id, quantity_per_day, price_per_unit, start_date, status) VALUES (?, ?, ?, ?, "2026-01-01", "ACTIVE")',
+                    [customerId, productId, 1.5, productPrice]
                 );
             } else {
-                await pool.query('UPDATE subscriptions SET status = "ACTIVE" WHERE customer_id = ?', [customerId]);
+                await pool.query('UPDATE subscriptions SET status = "ACTIVE", quantity_per_day = 1.5, start_date = "2026-01-01" WHERE id = ?', [subs[0].id]);
             }
 
-            // Assign to Kothrud Route
+            // Assign to Delivery Route with sequence stop_order
             await pool.query(
-                'INSERT INTO delivery_routes (customer_id, delivery_boy_id) VALUES (?, ?)',
-                [customerId, dbId]
+                'INSERT INTO delivery_routes (customer_id, delivery_boy_id, stop_order) VALUES (?, ?, ?)',
+                [customerId, dbId, i + 1]
             );
         }
 
-        console.log('✅ Successfully created 20 real Kothrud customers and assigned them!');
-        console.log('You can test logging in with:');
-        console.log('Email: kothrud@dairy.com');
-        console.log('Password: Test@1234');
+        console.log('✅ Successfully created 20 real Kothrud customers and assigned them to Rahul Sharma!');
         
+        // Generate deliveries for today
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        await generateForDate(today);
+        console.log(`✅ Daily deliveries generated for ${today}`);
+
     } catch (error) {
         console.error('Error seeding data:', error);
     } finally {

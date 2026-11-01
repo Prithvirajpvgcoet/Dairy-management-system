@@ -384,7 +384,7 @@ const getSummary = async (req, res) => {
             SELECT 
                 COUNT(*) as total_assigned,
                 SUM(CASE WHEN del.status = 'DELIVERED' THEN 1 ELSE 0 END) as delivered,
-                SUM(CASE WHEN del.status = 'NOT_DELIVERED' THEN 1 ELSE 0 END) as pending
+                SUM(CASE WHEN del.status = 'PENDING' OR del.status = 'NOT_DELIVERED' OR del.status IS NULL THEN 1 ELSE 0 END) as pending
             FROM delivery_routes dr
             LEFT JOIN deliveries del ON del.customer_id = dr.customer_id AND del.date = ?
             WHERE dr.delivery_boy_id = ?
